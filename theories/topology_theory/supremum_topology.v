@@ -1,7 +1,8 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
-From mathcomp Require Import boot order algebra finmap all_classical.
-From mathcomp Require Import topology_structure uniform_structure.
+From mathcomp Require Import boot order algebra finmap all_classical reals.
+From mathcomp Require Import topology_structure uniform_structure 
+  pseudometric_structure.
 
 (**md**************************************************************************)
 (* # Supremum topology                                                        *)
@@ -217,3 +218,40 @@ exists (open_finI_from (\bigcup_n g n) id); split.
 Qed.
 
 End sup_uniform.
+
+Definition sup_pseudometric (R : realType) (T : Type) (Ii : Type)
+  (Tc : Ii -> PseudoMetric R T) (Icnt : countable [set: Ii]) : Type := T.
+
+Section sup_pseudometric.
+Variable (R : realType) (T : choiceType) (Ii : Type).
+Variable (Tc : Ii -> PseudoMetric R T).
+
+Hypothesis Icnt : countable [set: Ii].
+
+Local Notation S := (sup_pseudometric Tc Icnt).
+
+Let TS := fun i => PseudoMetric.Pack (Tc i).
+
+Let countable_uniformityT := @countable_sup_ent T Ii Tc Icnt
+  (fun i => @countable_uniformity_metric _ (TS i)).
+
+HB.instance Definition _ : PseudoMetric R S :=
+  PseudoMetric.on (countable_uniform countable_uniformityT).
+
+End sup_pseudometric.
+
+Lemma uniform_pseudometric_sup {R : realType} {T : puniformType} :
+    @entourage T = @sup_ent T {E : set (T * T) | @entourage T E}
+  (fun E => Uniform.class (@gauge.type T (projT1 E) (projT2 E))).
+Proof.
+rewrite eqEsubset; split => [E entE|E].
+  exists E => //=.
+  pose pe : {classic {E0 : set (T * T) | _}} * _ := (exist _ E entE, E).
+  have entPE : `[< @entourage (gauge.type entE) E >].
+    by apply/asboolP; exists 0%N => // ? [].
+  exists (fset1 (exist _ pe entPE)) => //=; first by move=> ?; rewrite in_setE.
+  by rewrite set_fset1 bigcap_set1.
+case=> W /= [/= J] _ <- /filterS; apply; apply: filter_bigI => -[] [] [] /= D.
+move=> entD G /[dup] /asboolP [n _ + _ _] => /filterS; apply.
+exact: gauge.iter_split_ent.
+Qed.

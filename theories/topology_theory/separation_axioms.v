@@ -1,12 +1,9 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
 From mathcomp Require Import boot order algebra interval_inference finmap.
-From mathcomp Require Import boolp classical_sets functions wochoice.
+From mathcomp Require Import boolp classical_sets functions wochoice contra.
 From mathcomp Require Import cardinality fsbigop set_interval filter reals.
-From mathcomp Require Import topology_structure compact subspace_topology
-  discrete_topology order_topology pseudometric_structure num_topology
-  one_point_compactification uniform_structure connected supremum_topology
-  sigT_topology.
+From mathcomp Require Import topology_structure connected compact hausdorff.
 
 (**md**************************************************************************)
 (* # Separation Axioms                                                        *)
@@ -37,17 +34,6 @@ From mathcomp Require Import topology_structure compact subspace_topology
 (*      zero_dimensional T == points are separable by a clopen set            *)
 (*           perfect_set A == A is closed, and every point in A is            *)
 (*                            a limit point of A                              *)
-(* ```                                                                        *)
-(* ## metrizability for uniform spaces                                        *)
-(* ```                                                                        *)
-(*  countable_uniform.type == endows a pseudoMetric on a uniform type whose   *)
-(*                            entourage has a countable basis                 *)
-(*        sup_pseudometric == the pseudometric induced for the supremum       *)
-(*                            of countably many pseudoMetrics                 *)
-(*                 gauge E == for an entourage E, gauge E is a filter which   *)
-(*                            includes `iter n split_ent E`.                  *)
-(*                            Critically, `gauge E` forms a uniform space     *)
-(*                            with a countable uniformity.                    *)
 (* ```                                                                        *)
 (******************************************************************************)
 
@@ -95,28 +81,306 @@ Qed.
 End set_nbhs.
 
 Section point_separation_axioms.
-Context {T : topologicalType}.
+Context {R : realType} {T : topologicalType}.
+Import numFieldTopology.Exports.
 
-Definition kolmogorov_space := forall x y, x != y ->
+Definition is_kolmogorov_space := forall x y, x != y ->
   exists A : set T, (A \in nbhs x /\ y \in ~` A) \/ (A \in nbhs y /\ x \in ~` A).
 
-Definition accessible_space := forall x y, x != y ->
+Definition is_accessible_space := forall x y, x != y ->
   exists A : set T, [/\ open A, x \in A & y \in ~` A].
 
-Definition hausdorff_space := forall p q : T, cluster (nbhs p) q -> p = q.
+Definition is_hausdorff_space := forall p q : T, cluster (nbhs p) q -> p = q.
 
-Lemma compact_closed (A : set T) : hausdorff_space -> compact A -> closed A.
+Definition is_urysohn_space := forall (x y : T), x != y -> 
+  exists AB, [/\
+    closed AB.1, closed AB.2, nbhs x AB.1, nbhs y AB.2 & [disjoint AB.1 & AB.2]
+  ].
+
+Definition is_completely_hausdorff_space := forall x y : T, x != y ->
+  exists (f : T -> R), [/\ continuous f , f x = 0 & f y = 1 ].
+
+Definition is_regular_space :=
+  forall (x : T) (F : set T), closed F -> (~ F x) ->
+    exists (A B : set T), [/\
+      nbhs x A , set_nbhs F B & [disjoint A & B]
+    ].
+
+Definition is_completely_regular_space := forall (x : T) (F : set T),
+  closed F -> (~ F x) -> exists (f : T -> R), [/\
+    continuous f, f x = 0 & (forall y, F y -> f y = 1)
+  ].
+
+Definition is_normal_space :=
+  forall A : set T, closed A ->
+    filter_from (set_nbhs A) closure `=>` set_nbhs A.
+
+Definition is_completely_normal_space :=
+  forall A B : set T, separated A B -> 
+    exists UV, [/\ set_nbhs A UV.1, set_nbhs B UV.2 & [disjoint UV.1 & UV.2]].
+
+Definition is_perfectly_normal_space :=
+  forall A B : set T, closed A -> closed B -> [disjoint A & B] ->
+    exists f : T -> R, [/\ 
+      continuous f, 
+      A = f @^-1` [set 0] & B = f @^-1` [set 1]
+    ].
+
+End point_separation_axioms.
+Arguments is_kolmogorov_space : clear implicits.
+Arguments is_accessible_space : clear implicits.
+Arguments is_hausdorff_space : clear implicits.
+Arguments is_urysohn_space : clear implicits.
+Arguments is_completely_hausdorff_space : clear implicits.
+Arguments is_regular_space : clear implicits.
+Arguments is_completely_regular_space : clear implicits.
+Arguments is_normal_space : clear implicits.
+Arguments is_completely_normal_space : clear implicits.
+Arguments is_perfectly_normal_space : clear implicits.
+
+Section separation_equivalences.
+Context (R : realType) (T : topologicalType).
+
+Lemma accessibleP : 
+  is_accessible_space T  <-> (forall x : T, closed [set x]). 
 Proof.
-move=> hT Aco p clAp; have pA := [elaborate @withinT _ (nbhs p) A _].
-have [q [Aq clsAp_q]] := [elaborate Aco _ _ pA]; rewrite (hT p q) //.
+split=> [T1 x|cs1 x y xy].
+  rewrite -[X in closed X]setCK; apply: open_closedC.
+  rewrite openE => y /eqP /T1 [U [oU yU xU]].
+  rewrite /interior nbhsE /=; exists U; last by rewrite subsetC1.
+  by split=> //; exact: set_mem.
+exists [set~ y]; split.
+- by apply: closed_openC.
+- by rewrite inE/=; apply/eqP.
+- by rewrite inE/=.
+Qed.
+
+Lemma open_hausdorffP :
+  is_hausdorff_space T <->
+  (forall (x y : T), x != y -> exists2 AB, 
+    (x \in AB.1 /\ y \in AB.2) &
+    [/\ open AB.1, open AB.2 & [disjoint AB.1 & AB.2]]).
+Proof.
+split => [T_filterT2|T_openT2] x y.
+  have := contra_not (T_filterT2 x y); move=> + /eqP => /[apply].
+  move=> /existsNP[A] /existsNP[B] /not_implyP[xA] /not_implyP[yB].
+  move=> /nonemptyPn AIB_eq0.
+  move: xA yB; rewrite !nbhsE => -[oA [ooA oAx] oAA] [oB [ooB oBx] oBB].
+  by exists (oA, oB); rewrite ?inE; split => //; apply: subsetI_eq0 AIB_eq0.
+contra => /T_openT2[[A B] /= [/set_mem Ax /set_mem Bx] [oA oB AdB]].
+exists A, B; last split; [ exact: open_nbhs_nbhs .. |].
+by apply/disj_setPLR.
+Qed.
+
+Lemma closed_normalP :
+  is_normal_space T <->
+  forall (A B : set T), closed A -> closed B -> [disjoint A & B] ->
+    exists UV, 
+      [/\ set_nbhs A UV.1, set_nbhs B UV.2 & [disjoint UV.1 & UV.2]].
+Proof.
+split.
+- move=> hN A B cA cB dAB.
+  have nAcB : set_nbhs A (~` B).
+    apply/set_nbhsP; exists (~` B); split=> //.
+    + by apply: closed_openC.
+    + by apply/disj_setPLR.
+  have [U nAU /subsetCr +] := hN A cA _ nAcB.
+  rewrite -interiorC => BicU.
+  exists (U, (~` U)°); split=> //=.
+  + apply/set_nbhsP; exists (~` U)°; split=> //.
+    exact: open_interior.
+  + by rewrite interiorC; apply/disj_setPCl; exact: subset_closure.
+- move=> hN F cF U nFU.
+  pose G := ~` U°.
+  have cG : closed G.
+    by apply: open_closedC; exact: open_interior.
+  have dFG : [disjoint F & G].
+    by apply/disj_setPCl; exact: nFU.
+  have [[V W] /= [nFV nGW dVW]] := hN F G cF cG dFG.
+  have VsciW : V `<=` ~` W°.
+    move: dVW => /disj_setPLR /subset_trans; apply.
+    apply: subsetC; exact: interior_subset.
+  exists V => //.
+  apply: (subset_trans (B := ~` W°)); last first.
+    apply: subset_trans; last exact: interior_subset.
+    by apply: subsetCl; exact: nGW. 
+  move: VsciW => /closureS; congr subset.
+  by apply/esym/closure_id; apply: open_closedC; exact: open_interior.
+Qed.
+
+Lemma open_normalP :
+  is_normal_space T <->
+  forall (G H : set T), open G -> open H -> G `|` H = [set: T] ->
+    exists UV, [/\ 
+      open UV.1 , open UV.2 ,
+      UV.1 `|` G = [set: T] , 
+      UV.2 `|` H = [set: T] & 
+      [disjoint UV.1 & UV.2]
+    ].
+Proof.
+rewrite closed_normalP; split.
+- move=> hc G H oG oH GHT.
+  have [] := hc (~` G) (~` H) (open_closedC oG) (open_closedC oH).
+    by apply/eqP; rewrite -setCU; apply: (canLR setCK); rewrite setC0.
+  move=> [U V] /= [ncGU ncHV /disj_setPS dUV].
+  have dUVo : [disjoint U° & V°].
+    apply/disj_setPS; apply: subset_trans dUV.
+    by apply: setISS; exact: interior_subset.
+  exists (U°, V°); split => //=; do ?exact: open_interior; by [
+    rewrite -setC0; apply: (canRL setCK); rewrite setCU; 
+    rewrite setIC; apply/subsets_disjoint
+  ].
+- move=> ho A B cA cB dAB.
+  have [] := ho (~`A) (~`B) (closed_openC cA) (closed_openC cB).
+    rewrite -setCI; apply: (canLR setCK); rewrite setCT.
+    by apply/eqP.
+  move=> [U V] /= [oU oV].
+  rewrite -setC0 => /(canLR setCK) + /(canLR setCK) + dUV.
+  rewrite !setCU !setCK !(setIC (~` _)).
+  move => /subsets_disjoint + /subsets_disjoint +.
+  have <- : U° = U by apply/interior_id.
+  have <- : V° = V by apply/interior_id.
+  by exists (U, V).
+Qed.
+
+Lemma completely_normalP :
+  is_completely_normal_space T <->
+  forall A : set T, is_normal_space (subspace A).
+Proof.
+Admitted.
+
+End separation_equivalences.
+
+HB.mixin Record Topological_isKolmogorov T & Topological T := {
+  kolmogorov_space : is_kolmogorov_space T
+}.
+
+#[short(type="kolmogorovType")]
+HB.structure Definition Kolmogorov := 
+  {T of Topological T & Topological_isKolmogorov T}.
+
+#[short(type="pkolmogorovType")]
+HB.structure Definition PKolmogorov :=
+  {T of Pointed T & Kolmogorov T}.
+
+HB.mixin Record Kolmogorov_isAccessible T & Kolmogorov T := {
+  accessible_space : is_accessible_space T
+}.
+
+#[short(type="accessibleType")]
+HB.structure Definition Accessible :=
+  {T of Kolmogorov T & Kolmogorov_isAccessible T}.
+
+#[short(type="paccessibleType")]
+HB.structure Definition PAccessible :=
+  {T of Pointed T & Accessible T}.
+
+HB.factory Record Topological_isAccessible T & Topological T := {
+  accessible_space_subproof : is_accessible_space T
+}.
+HB.builders Context T & Topological_isAccessible T.
+
+Let accessible_kolmogorov : is_kolmogorov_space T.
+Proof.
+move=> x y /accessible_space_subproof [A [oA xA yA]].
+exists A; left; split=> //.
+by rewrite nbhsE inE; exists A => //; rewrite inE in xA.
+Qed.
+
+HB.instance Definition _ := 
+  Topological_isKolmogorov.Build T accessible_kolmogorov.
+HB.instance Definition _ :=
+  Kolmogorov_isAccessible.Build T accessible_space_subproof.
+
+HB.end.
+
+HB.factory Record FiniteClosed_isAccessible T & Topological T := {
+  finite_closed_subproof : forall (A : set T), finite_set A -> closed A
+}.
+HB.builders Context T & FiniteClosed_isAccessible T.
+
+Let finite_closed_accessible : is_accessible_space T.
+Proof.
+move=> x y xy.
+by exists (~` [set y]); rewrite !inE/=; split;
+  [rewrite openC; exact: finite_closed_subproof|exact/eqP|].
+Qed.
+
+HB.instance Definition _ := 
+  Topological_isAccessible.Build T finite_closed_accessible.
+
+HB.end.
+
+Section accessible_theory.
+Context (T : accessibleType).
+
+Lemma closed_set1 (x : T) : closed [set x].
+Proof.
+rewrite -[X in closed X]setCK; apply: open_closedC.
+rewrite openE => y /eqP /accessible_space [U [oU yU xU]].
+rewrite /interior nbhsE /=; exists U; last by rewrite subsetC1.
+by split=> //; exact: set_mem.
+Qed.
+
+Lemma finite_set_closed (A : set T) :
+  finite_set A -> closed A.
+Proof.
+move=> fA; rewrite -(fsbig_setU_set1 fA) fsbig_finite//=.
+by apply: bigsetU_closed => x xA; exact: closed_set1.
+Qed.
+
+Lemma limit_point_closed (A : set T) : closed (limit_point A).
+Proof.
+rewrite -openC openE/= => a.
+rewrite /setC/= not_limit_pointE => -[X].
+rewrite nbhsE/= => -[U oaU UX] XAa.
+rewrite /interior nbhsE/=.
+exists U => // x Ux /=.
+rewrite not_limit_pointE.
+have [xa|xneqa] := eqVneq x a.
+  exists U; rewrite xa; first exact: open_nbhs_nbhs.
+  by apply: subset_trans XAa; exact: setIS.
+exists (U `&` [set~ a]).
+  apply: open_nbhs_nbhs; split.
+    apply: openI; first by case: oaU.
+    by rewrite openC; exact: closed_set1.
+  by split => //; exact/eqP.
+apply: (@subset_trans _ (A `&` (X `&` [set~ a]))).
+  by apply: setIS; exact: setSI.
+apply: (@subset_trans _ ([set a] `&` [set~ a])).
+  by rewrite setIA; exact: setSI.
+by rewrite setICr.
+Qed.
+End accessible_theory.
+
+HB.mixin Record Accessible_isHausdorff T & Accessible T := {
+  hausdorff_space : is_hausdorff_space T
+}.
+
+#[short(type="hausdorffType")]
+HB.structure Definition Hausdorff :=
+  {T of Accessible T & Accessible_isHausdorff T}.
+
+#[short(type="phausdorffType")]
+HB.structure Definition PHausdorff :=
+  {T of Pointed T & Hausdorff T}.
+
+Section hausdorff_theory.
+Context (T : hausdorffType).
+
+Lemma compact_closed (A : set T) : compact A -> closed A.
+Proof.
+move=> Aco p clAp; have pA := [elaborate @withinT _ (nbhs p) A _].
+have [q [Aq clsAp_q]] := [elaborate Aco _ _ pA]. 
+rewrite (hausdorff_space p q) //.
 by apply: cvg_cluster clsAp_q; apply: cvg_within.
 Qed.
 
 Lemma compact_cluster_set1 (x : T) F V :
-  hausdorff_space -> compact V -> nbhs x V ->
+  compact V -> nbhs x V -> 
   ProperFilter F -> F V -> cluster F = [set x] -> F --> x.
 Proof.
-move=> ? cptV nxV PF FV clFx1 U nbhsU; rewrite nbhs_simpl.
+move=> cptV nxV PF FV clFx1 U nbhsU; rewrite nbhs_simpl.
 wlog oU : U nbhsU / open U.
   rewrite /= nbhsE in nbhsU; case: nbhsU => O oO OsubU /(_ O) WH.
   by apply: (filterS OsubU); apply: WH; [exact: open_nbhs_nbhs | by case: oO].
@@ -136,101 +400,316 @@ by move=> t [Vt Wt]; apply: contrapT => Ut; exact: (VUW t).
 Qed.
 
 Lemma compact_precompact (A : set T) :
-  hausdorff_space -> compact A -> precompact A.
+  compact A -> precompact A.
 Proof.
-by move=> h c; rewrite precompactE -(closure_id _).1//; exact: compact_closed.
+by move=> c; rewrite precompactE -(closure_id _).1//; exact: compact_closed.
 Qed.
 
-Lemma open_hausdorff : hausdorff_space =
-  forall (x y : T), x != y ->
+Lemma open_hausdorff (x y : T) : x != y ->
     exists2 AB, (x \in AB.1 /\ y \in AB.2) &
                 [/\ open AB.1, open AB.2 & AB.1 `&` AB.2 == set0].
+Proof. by move: x y; apply/open_hausdorffP; exact: hausdorff_space. Qed.
+
+End hausdorff_theory.
+
+HB.factory Record Topological_isHausdorff T & Topological T := {
+  hausdorff_space_subproof : is_hausdorff_space T
+}.
+HB.builders Context T & Topological_isHausdorff T.
+
+Let hausdorff_accessible : is_accessible_space T.
 Proof.
-rewrite propeqE; split => [T_filterT2|T_openT2] x y.
-  have := contra_not (T_filterT2 x y); rewrite (rwP eqP) (rwP negP).
-  move=> /[apply] /asboolPn/existsp_asboolPn[A]; rewrite -existsNE => -[B].
-  rewrite [nbhs _ _ -> _](rwP imply_asboolP) => /negP.
-  rewrite asbool_imply !negb_imply => /andP[/asboolP xA] /andP[/asboolP yB].
-  move=> /asboolPn; rewrite -set0P => /negP; rewrite negbK => /eqP AIB_eq0.
-  move: xA yB; rewrite !nbhsE.
-  move=> - [oA [oA_open oAx] oAA] [oB [oB_open oBx] oBB].
-  by exists (oA, oB); rewrite ?inE; split => //; apply: subsetI_eq0 AIB_eq0.
-apply: contraPP => /eqP /T_openT2[[/=A B]].
+move: hausdorff_space_subproof => /open_hausdorffP + x y => /[apply].
+move=> [[U V] [xU yV]] [/= ? ? /eqP].
+rewrite setIC => /disjoints_subset VUc; exists U; repeat split => //.
+by rewrite inE; apply: VUc; rewrite -inE.
+Qed.
+
+HB.instance Definition _ :=
+  Topological_isAccessible.Build T hausdorff_accessible.
+HB.instance Definition _ :=
+  Accessible_isHausdorff.Build T hausdorff_space_subproof.
+
+HB.end.
+
+HB.factory Record Topological_isOpenHausdorff T & Topological T := {
+  open_hausdorff_subproof : forall (x y : T), x != y ->
+    exists2 AB, (x \in AB.1 /\ y \in AB.2) &
+            [/\ open AB.1, open AB.2 & AB.1 `&` AB.2 == set0]
+}.
+HB.builders Context T & Topological_isOpenHausdorff T.
+
+Let hausdorff : forall x y : T, cluster (nbhs x) y -> x = y.
+Proof.
+move=> x y.
+apply: contraPP => /eqP /open_hausdorff_subproof[[/=A B]].
 rewrite !inE => - [xA yB] [Aopen Bopen /eqP AIB_eq0].
 move=> /(_ A B (open_nbhs_nbhs _) (open_nbhs_nbhs _)).
 by rewrite -set0P => /(_ _ _)/negP; apply.
 Qed.
 
-Lemma hausdorff_accessible : hausdorff_space -> accessible_space.
+HB.instance Definition _ := Topological_isHausdorff.Build T hausdorff.
+
+HB.end.
+
+HB.mixin Record Hausdorff_isUrysohn T & Hausdorff T := {
+  urysohn_space : is_urysohn_space T
+}.
+
+#[short(type="urysohnType")]
+HB.structure Definition Urysohn := 
+  {T of Hausdorff T & Hausdorff_isUrysohn T}.
+
+HB.factory Record Topological_isUrysohn T & Topological T := {
+  urysohn_space_subproof : is_urysohn_space T
+}.
+HB.builders Context T & Topological_isUrysohn T.
+
+Let urysohn_hausdorff : is_hausdorff_space T.
 Proof.
-rewrite open_hausdorff => hsdfT => x y /hsdfT [[U V] [xU yV]] [/= ? ? /eqP].
-rewrite setIC => /disjoints_subset VUc; exists U; repeat split => //.
-by rewrite inE; apply: VUc; rewrite -inE.
+apply/open_hausdorffP => x y xy.
+have [[A B] /= [_ _ An Bn dAB]] := @urysohn_space_subproof x y xy.
+exists (A°, B°) => /=.
+  by split; apply: mem_set.
+split; [ exact: open_interior .. |].
+apply/disj_setPS; move: dAB => /disj_setPS.
+by apply: subset_trans; apply: setISS; exact: interior_subset.
 Qed.
 
-Lemma accessible_closed_set1 : accessible_space -> forall x : T, closed [set x].
+HB.instance Definition _ := Topological_isHausdorff.Build T urysohn_hausdorff.
+HB.instance Definition _ := Hausdorff_isUrysohn.Build T urysohn_space_subproof.
+
+HB.end.
+
+HB.mixin Record Urysohn_isRegular T & Urysohn T := {
+  regular_space : is_regular_space T
+}.
+
+#[short(type="regularHausdorffType")]
+HB.structure Definition RegularHausdorff :=
+  {T of Urysohn T & Urysohn_isRegular T}.
+
+HB.factory Record Hausdorff_isRegular T & Hausdorff T := {
+  regular_space_subproof : is_regular_space T
+}.
+HB.builders Context T & Hausdorff_isRegular T.
+
+Let regular_urysohn : is_urysohn_space T.
 Proof.
-move=> T1 x; rewrite -[X in closed X]setCK; apply: open_closedC.
-rewrite openE => y /eqP /T1 [U [oU yU xU]].
-rewrite /interior nbhsE /=; exists U; last by rewrite subsetC1.
-by split=> //; exact: set_mem.
+move=> x y xy.
+move: (@hausdorff_space T) => /open_hausdorffP /(_ x y xy).
+move=> [[U V] /= [/set_mem Ux /set_mem Vy] [oU oV dUV]].
+have ncVx : (~` closure V) x.
+  rewrite closureE /smallest setC_bigcap.
+  exists (~` U) => //=.
+  split; first by apply: open_closedC.
+  by apply/disj_setPRL.
+have := @regular_space_subproof x (closure V) (@closed_closure _ _) ncVx.
+move=> [U' [V' [nU' nV' dUV']]].
+exists (closure U', closure V); split=> /=.
+- exact: closed_closure.
+- exact: closed_closure.
+- by apply: filterS nU'; exact: subset_closure.
+- apply: filterS; first exact: subset_closure.
+  by apply: open_nbhs_nbhs.
+apply/disj_setPLR.
+apply: (subset_trans (B := ~` V'°)); last first.
+  by apply: subsetC; exact: nV'.
+have -> : ~` V'° = closure (~` V'°).
+  by apply/closure_id; apply: open_closedC; exact: open_interior.
+apply: closureS.
+move: dUV' => /disj_setPLR /subset_trans; apply.
+by apply: subsetC; exact: interior_subset.
 Qed.
 
-Lemma accessible_kolmogorov : accessible_space -> kolmogorov_space.
+HB.instance Definition _ := Hausdorff_isUrysohn.Build T regular_urysohn.
+HB.instance Definition _ := Urysohn_isRegular.Build T regular_space_subproof.
+
+HB.end.
+
+HB.mixin Record Urysohn_isCompletelyHausdorff (R : realType) T & Urysohn T := {
+  completely_hausdorff_space : is_completely_hausdorff_space R T
+}.
+
+#[short(type="completelyHausdorffType")]
+HB.structure Definition CompletelyHausdorff (R : realType) := 
+  {T of Urysohn T & Urysohn_isCompletelyHausdorff R T}.
+
+HB.factory Record Topological_isCompletelyHausdorff (R : realType) T 
+  & Topological T := {
+    completely_hausdorff_subproof : is_completely_hausdorff_space R T
+  }.
+HB.builders Context R T & Topological_isCompletelyHausdorff R T.
+
+Import numFieldTopology.Exports.
+
+Let urysohn : is_urysohn_space T.
 Proof.
-move=> T1 x y /T1 [A [oA xA yA]]; exists A; left; split=> //.
-by rewrite nbhsE inE; exists A => //; rewrite inE in xA.
+move=> x y xy.
+have [f [cf fx0 fy1]] := completely_hausdorff_subproof xy.
+near (0 : R)^'+ => e.
+have e0 : e > 0 by near: e; exact: nbhs_right_gt.
+pose A := f @^-1` `[-e,e].
+pose B := f @^-1` `[1-e,1+e].
+exists (A, B); split=> //=.
+- by apply: preimage_closed => //; exact: itv_closed.
+- by apply: preimage_closed => //; exact: itv_closed.
+- apply: cf; rewrite fx0.
+  exists e => // t /=.
+  by rewrite ltr_distlC !add0r in_itv/= => /andP[/ltW -> /ltW ->].
+- apply: cf; rewrite fy1.
+  exists e => // t /=.
+  by rewrite ltr_distlC in_itv/= => /andP[/ltW -> /ltW ->].
+rewrite /disj_set /A /B -preimage_setI.
+apply/eqP/preimage0eq/disjoints_subset => t /=.
+rewrite !in_itv/= => /andP[_ te] /andP[oet _].
+suff eoe : e < 1 - e.
+  by have := le_lt_trans te (lt_le_trans eoe oet); rewrite ltxx.
+rewrite ltrBrDr -mulr2n -mulr_natr -ltr_pdivlMr// div1r.
+by near: e; apply: nbhs_right_lt.
+Unshelve. all: by end_near.
 Qed.
 
-Lemma accessible_finite_set_closed :
-  accessible_space <-> forall A : set T, finite_set A -> closed A.
+HB.instance Definition _ := Topological_isUrysohn.Build T urysohn.
+HB.instance Definition _ :=
+  Urysohn_isCompletelyHausdorff.Build R T completely_hausdorff_subproof.
+
+HB.end.
+
+HB.mixin Record Regular_isTychonoff (R : realType) T
+    & CompletelyHausdorff R T & RegularHausdorff T := {
+  completely_regular_space : is_completely_regular_space R T
+}.
+
+#[short(type="tychonoffType")]
+HB.structure Definition Tychonoff (R : realType) :=
+  {T of CompletelyHausdorff R T & RegularHausdorff T & 
+    Regular_isTychonoff R T}.
+
+HB.factory Record Hausdorff_isTychonoff (R : realType) T & Hausdorff T := {
+  completely_regular_subproof : is_completely_regular_space R T
+}.
+HB.builders Context R T & Hausdorff_isTychonoff R T.
+
+Let completely_hausdorff : is_completely_hausdorff_space R T.
 Proof.
-split => [TT1 A fA|h x y xy].
-  rewrite -(fsbig_setU_set1 fA) fsbig_finite//=.
-  by apply: bigsetU_closed => x xA; exact: accessible_closed_set1.
-by exists (~` [set y]); rewrite !inE/=; split;
-  [rewrite openC; exact: h|exact/eqP|].
+move=> x y /eqP xy.
+have := @completely_regular_subproof x [set y] (@closed_set1 _ _) xy.
+by move=> [f [cf fx0 /(_ y erefl) fy1]]; exists f.
 Qed.
 
-End point_separation_axioms.
-
-Arguments hausdorff_space : clear implicits.
-Arguments accessible_space : clear implicits.
-Arguments kolmogorov_space : clear implicits.
-
-Lemma limit_point_closed {T : topologicalType} (A : set T) :
-  accessible_space T -> closed (limit_point A).
+Let regular : is_regular_space T.
 Proof.
-move=> accT; rewrite -openC openE/= => a.
-rewrite /setC/= not_limit_pointE => -[X].
-rewrite nbhsE/= => -[U oaU UX] XAa.
-rewrite /interior nbhsE/=.
-exists U => // x Ux /=.
-rewrite not_limit_pointE.
-have [xa|xneqa] := eqVneq x a.
-  exists U; rewrite xa; first exact: open_nbhs_nbhs.
-  by apply: subset_trans XAa; exact: setIS.
-exists (U `&` [set~ a]).
-  apply: open_nbhs_nbhs; split.
-    apply: openI; first by case: oaU.
-    by rewrite openC; exact: accessible_closed_set1.
-  by split => //; exact/eqP.
-apply: (@subset_trans _ (A `&` (X `&` [set~ a]))).
-  by apply: setIS; exact: setSI.
-apply: (@subset_trans _ ([set a] `&` [set~ a])).
-  by rewrite setIA; exact: setSI.
-by rewrite setICr.
+move=> x F cF nFx.
+have := @completely_regular_subproof x F cF nFx.
+
+HB.instance Definition _ :=
+  Hausdorff_isRegular.Build T regular.
+HB.instance Definition _ :=
+  Urysohn_isCompletelyHausdorff.Build R T completely_hausdorff.
+HB.instance Definition _ :=
+  Regular_isTychonoff.Build R T completely_regular_subproof.
+
+HB.end.
+
+HB.mixin Record Topological_isNormal T & Topological T := {
+  normal_space : is_normal_space T
+}.
+
+#[short(type="normalType")]
+HB.structure Definition Normal :=
+  {T of Topological T & Topological_isNormal T}.
+
+HB.mixin Record Normal_isCompletelyNormal T & Normal T := {
+  completely_normal_space : is_completely_normal_space T
+}.
+
+#[short(type="completelyNormalType")]
+HB.structure Definition CompletelyNormal :=
+  {T of Normal T & Normal_isCompletelyNormal T}.
+
+HB.factory Record Topological_isCompletelyNormal T & Topological T := {
+  completely_normal_subproof : is_completely_normal_space T
+}.
+HB.builders Context T & Topological_isCompletelyNormal T.
+
+Let normal : is_normal_space T.
+Proof.
+move=> A cA V /set_nbhsP[U [oU AU UV]].
+have [] := @completely_normal_subproof A (~` U).
+  split.
+  - apply/subsets_disjoint.
+    by move: AU; congr subset; apply/closure_id.
+  - suff <- : ~` U = closure (~` U) by apply/subsets_disjoint.
+    by apply/closure_id/open_closedC.
+move=> [A' B] /= [sAA' /set_nbhsP[B' [oB' /subsetCl cB'U B'B]] dA'B].
+exists (~` B'); last first.
+  apply: subset_trans UV.
+  by move: cB'U; congr subset; apply/closure_id/open_closedC.
+apply: filterS sAA'.
+apply: subsetCr; apply: (subset_trans B'B).
+by apply/disj_setPRL.
 Qed.
-Arguments limit_point_closed {T} A.
 
-Lemma subspace_hausdorff {T : topologicalType} (A : set T) :
-  hausdorff_space T -> hausdorff_space (subspace A).
+HB.instance Definition _ := Topological_isNormal.Build T normal.
+HB.instance Definition _ := 
+  Normal_isCompletelyNormal.Build T completely_normal_subproof.
+
+HB.end.
+
+HB.factory Record HereditarilyNormal_isCompletelyNormal T & Topological T := {
+  hereditarily_normal_subproof : forall (A : set T), 
+    open A -> is_normal_space (subspace A)
+}.
+HB.builders Context T & HereditarilyNormal_isCompletelyNormal T.
+
+Let completely_normal : is_completely_normal_space T.
 Proof.
-rewrite ?open_hausdorff => + x y xNy => /(_ x y xNy).
+move=> A B sAB.
+pose Y := ~` (closure A `&` closure B).
+have oY : open Y.
+  by apply/closed_openC; apply: closedI; exact: closed_closure.
+have := @hereditarily_normal_subproof Y oY.
+
+(*
+
+HB.mixin Record CompletelyNormal_isPerfectlyNormal (R : realType) T 
+    & CompletelyNormal T := {
+  perfectly_normal_space : is_perfectly_normal_space R T
+}.
+
+#[short(type="perfectlyNormalType")]
+HB.structure Definition PerfectlyNormal R :=
+  {T of CompletelyNormal T & CompletelyNormal_isPerfectlyNormal R T}.
+
+HB.factory Record Topological_isPerfectlyNormal (R : realType) T 
+    & Topological T := {
+  perfectly_normal_subproof : is_perfectly_normal_space R T
+}.
+HB.builders Context R T & Topological_isPerfectlyNormal R T.
+
+Let completely_normal : is_completely_normal_space T.
+Proof.
+move=> A B sepAB.
+have := @perfectly_normal_subproof A B. *)
+
+Section subspace_hausdorff.
+Context (T : hausdorffType) (A : set T).
+
+Let subspace_hausdorff : is_hausdorff_space (subspace A).
+Proof.
+have := @hausdorff_space T.
+rewrite !open_hausdorffP => + x y xNy => /(_ x y xNy).
 move=> [[P Q]] /= [Px Qx] /= [/open_subspaceW oP /open_subspaceW oQ].
 by move=> ?; exists (P, Q); split => //=; [exact: oP | exact: oQ].
 Qed.
 
+HB.instance Definition _ := 
+  Topological_isHausdorff.Build (subspace A) subspace_hausdorff.
+
+End subspace_hausdorff.
+
+(*
 Lemma discrete_hausdorff {T : discreteTopologicalType} : hausdorff_space T.
 Proof.
 by move=> p q /(_ _ _ (discrete_set1 p) (discrete_set1 q)) [] // x [] -> ->.
@@ -302,14 +781,16 @@ move=> lcpt hsdfX [x|] [y|] //=.
   case/(_ (Some @` (~` U) `|` [set None]) (Some @` U)); first by exists U.
     exact: one_point_compactification_some_nbhs.
   by case=> [?|] [] [] //= + [] ? // /[swap] -[] -> => -[? /[swap] -[] <-].
-Qed.
+Qed.*)
 
-Section hausdorff_topologicalType.
-Variable T : topologicalType.
+Definition close (T : topologicalType) (x y : T) : Prop := 
+  forall M, open_nbhs y M -> closure M x.
+
+Section close_theory.
+Context (T : topologicalType).
 Implicit Types x y : T.
 
 Local Open Scope classical_set_scope.
-Definition close x y : Prop := forall M, open_nbhs y M -> closure M x.
 
 Lemma closeEnbhs x : close x = cluster (nbhs x).
 Proof.
@@ -351,19 +832,23 @@ have: (f `@ F) setT by apply: fFl; apply: filterT.
 by rewrite fmapiE; apply: filterS => x [y []]; exists y.
 Unshelve. all: by end_near. Qed.
 
-Hypothesis sep : hausdorff_space T.
+End close_theory.
+
+Section hausdorff_close.
+Context (T : hausdorffType).
+Implicit Types x y : T.
 
 Lemma closeE x y : close x y = (x = y).
 Proof.
 rewrite propeqE; split; last by move=> ->; exact: close_refl.
-by rewrite closeEnbhs; exact: sep.
+by rewrite closeEnbhs; exact: hausdorff_space.
 Qed.
 
 Lemma close_eq x y : close x y -> x = y.
 Proof. by rewrite closeE. Qed.
 
 Lemma cvg_unique {F} {FF : ProperFilter F} : is_subset1 [set x : T | F --> x].
-Proof. move=> Fx Fy; rewrite -closeE //; exact: (@cvg_close F). Qed.
+Proof. move=> Fx Fy; rewrite -closeE //; exact: (@cvg_close _ F). Qed.
 
 Lemma cvg_eq x y : x --> y -> x = y.
 Proof. by rewrite -closeE //; apply: cvg_close. Qed.
@@ -372,23 +857,23 @@ Lemma cvgi_unique {U : Type} {F} {FF : ProperFilter F} (f : U -> set T) :
   {near F, is_fun f} -> is_subset1 [set x : T | f `@ F --> x].
 Proof. by move=> ffun fx fy; rewrite -closeE //; exact: cvgi_close. Qed.
 
-End hausdorff_topologicalType.
+End hausdorff_close.
 
-Section hausdorff_ptopologicalType.
-Variable T : ptopologicalType.
-Implicit Types x y : T.
-
-Lemma close_cvg (F1 F2 : set_system T) {FF2 : ProperFilter F2} :
+Lemma close_cvg (T : ptopologicalType) 
+    (F1 F2 : set_system T) {FF2 : ProperFilter F2} :
   F1 --> F2 -> F2 --> F1 -> close (lim F1) (lim F2).
 Proof.
 move=> F12 F21.
 have [/(cvg_trans F21) F2l|dvgF1] := pselect (cvg F1).
-  by apply: (@cvg_close _ F2) => //; apply: cvgP F2l.
+  by apply: (@cvg_close _ _ F2) => //; apply: cvgP F2l.
 have [/(cvg_trans F12)/cvgP//|dvgF2] := pselect (cvg F2).
 rewrite dvgP // dvgP //; exact/close_refl.
 Qed.
+Arguments close_cvg {T} F1 F2 {FF2} _.
 
-Hypothesis sep : hausdorff_space T.
+Section phausdorff_theory.
+Context (T : phausdorffType).
+Implicit Types x y : T.
 
 Lemma cvg_lim {F} {FF : ProperFilter F} (l : T) :
   F --> l -> lim F = l.
@@ -411,9 +896,8 @@ Proof.
 by move=> f_prop fl; apply: get_unique =>// l' fl'; exact: cvgi_unique _ fl' fl.
 Qed.
 
-End hausdorff_ptopologicalType.
+End phausdorff_theory.
 #[global] Hint Resolve close_refl : core.
-Arguments close_cvg {T} F1 F2 {FF2} _.
 
 Section close_uniform.
 Implicit Types (U : uniformType).
@@ -469,6 +953,8 @@ rewrite closeEnbhs => B A /nbhs_ballP[_/posnumP[e2 e2B]]
 by exists y; split; [apply/e2B|apply/e1A; exact: ballxx].
 Qed.
 End close_uniform.
+
+
 
 Section set_separations.
 Context {T : topologicalType}.
@@ -655,439 +1141,6 @@ exists V; split; first split.
 Qed.
 
 End totally_disconnected.
-
-(* This section proves that uniform spaces, with a countable base for their
-   entourage, are metrizable. The definition of this metric is rather arcane,
-   and the proof is tough. That's ok because the resulting metric is not
-   intended to be used explicitly. Instead, this is typically used in
-   applications that do not depend on the metric:
-   - `metric spaces are T4`
-   - `in metric spaces, compactness and sequential compactness agree`
-   - infinite products of metric spaces are metrizable
-*)
-Module countable_uniform.
-Section countable_uniform.
-Local Open Scope relation_scope.
-Context {R : realType} {T : uniformType}.
-
-Hypothesis cnt_unif : @countable_uniformity T.
-
-Let f_ := projT1 (cid2 (iffLR countable_uniformityP cnt_unif)).
-
-Local Lemma countableBase : forall A, entourage A -> exists N, f_ N `<=` A.
-Proof. by have [] := projT2 (cid2 (iffLR countable_uniformityP cnt_unif)). Qed.
-
-Let entF : forall n, entourage (f_ n).
-Proof. by have [] := projT2 (cid2 (iffLR countable_uniformityP cnt_unif)). Qed.
-
-(* Step 1:
-   We build a nicer base `g` for `entourage` with better assumptions than `f`
-   - each (g_ n) is symmetric
-   - the sets (g_ n) are nested downward
-   - g_ n.+1 \o g_ n.+1 \o g_ n.+1 `<=` g_ n says the sets descend `quickly`
- *)
-
-Local Fixpoint g_ n : set (T * T) :=
-  if n is n.+1 then let W := split_ent (split_ent (g_ n)) `&` f_ n in W `&` W^-1
-  else [set: T*T].
-
-Let entG n : entourage (g_ n).
-Proof.
-elim: n => /=; first exact: entourageT.
-by move=> n entg; apply/entourage_invI; exact: filterI.
-Qed.
-
-Local Lemma symG n : (g_ n)^-1 = g_ n.
-Proof.
-by case: n => // n; rewrite eqEsubset; split; case=> ? ?; rewrite /= andC.
-Qed.
-
-Local Lemma descendG1 n : g_ n.+1 `<=` g_ n.
-Proof.
-apply: subIset; left; apply: subIset; left; apply: subset_trans.
-  by apply: split_ent_subset; exact: entourage_split_ent.
-by apply: subset_trans; last exact: split_ent_subset.
-Qed.
-
-Local Lemma descendG n m : (m <= n)%N -> g_ n `<=` g_ m.
-Proof.
-elim: n; rewrite ?leqn0; first by move=>/eqP ->.
-move=> n IH; rewrite leq_eqVlt ltnS => /orP [/eqP <- //|] /IH.
-by apply: subset_trans; exact: descendG1.
-Qed.
-
-Local Lemma splitG3 n : g_ n.+1 \; g_ n.+1 \; g_ n.+1 `<=` g_ n.
-Proof.
-suff g2split : g_ n.+1 \; g_ n.+1 `<=` split_ent (g_ n).
-  apply: subset_trans; last exact: subset_split_ent (entG n).
-  apply: set_compose_subset (g2split); rewrite -[_ n.+1]set_compose_diag.
-  apply: subset_trans g2split; apply: set_compose_subset => //.
-  by move=> [_ _] [z _] [<- <-]; exact: entourage_refl.
-apply: subset_trans; last exact: subset_split_ent.
-by apply: set_compose_subset; apply: subIset; left; apply: subIset; left.
-Qed.
-
-Local Lemma gsubf n : g_ n.+1 `<=` f_ n.
-Proof. by apply: subIset; left; apply: subIset; right. Qed.
-
-Local Lemma countableBaseG A : entourage A -> exists N, g_ N `<=` A.
-Proof.
-move=> /countableBase [N] fnA; exists N.+1.
-by apply: subset_trans fnA; exact: gsubf.
-Qed.
-
-(* Step 2.
-   We build a sensible notion of balls for our metric.
-   The naive attempt,
-                     `ball x e y := g_ (distN e) (x,y))
-   doesn't respect triangle inequality. We need to cook triangle inequality
-   into the balls themselves. So we define balls in terms of steps:
-      `ball x e y := there are n steps x_0 = x,...,x_i,..., x_n.+1 = y and
-                     e_1,...,e_n such that
-                           g_ (distN e_i) (x_i,x_i+1)
-                                    and
-                               sum (e_i) = e
-*)
-
-Local Open Scope classical_set_scope.
-Local Open Scope ring_scope.
-
-Local Definition distN (e : R) : nat := Num.truncn e^-1.
-
-Local Lemma distN0 : distN 0 = 0%N.
-Proof. by rewrite /distN invr0 truncn0. Qed.
-
-Local Lemma distN_nat (n : nat) : distN n%:R^-1 = n.
-Proof.
-by rewrite /distN invrK; apply/eqP; rewrite -(@eqr_nat R) -natrEtruncn.
-Qed.
-
-Local Lemma distN_le e1 e2 : e1 > 0 -> e1 <= e2 -> (distN e2 <= distN e1)%N.
-Proof.
-move=> e1pos e1e2; rewrite /distN le_truncn// lef_pV2// posrE.
-by rewrite (lt_le_trans e1pos).
-Qed.
-
-Local Fixpoint n_step_ball n x e z :=
-  if n is n.+1 then exists y d1 d2,
-    [/\ n_step_ball n x d1 y,
-        0 < d1,
-        0 < d2,
-        g_ (distN d2) (y, z) &
-        d1 + d2 = e]
-  else e > 0 /\ g_ (distN e) (x, z).
-
-Local Definition step_ball x e z := exists i, (n_step_ball i x e z).
-
-Local Lemma n_step_ball_pos n x e z : n_step_ball n x e z -> 0 < e.
-Proof.
-by case: n => [[]|] // n; case=> [?] [?] [?] [] ? ? ? ? <-; exact: addr_gt0.
-Qed.
-
-Local Lemma step_ball_pos x e z : step_ball x e z -> 0 < e.
-Proof. by case => ?; exact: n_step_ball_pos. Qed.
-
-Local Lemma entourage_nball e :
-  0 < e -> entourage [set xy | step_ball xy.1 e xy.2].
-Proof.
-move=> epos; apply: (@filterS _ _ _ (g_ (distN e))) => // [[x y]] ?.
-by exists 0%N.
-Qed.
-
-Local Lemma n_step_ball_center x e : 0 < e -> n_step_ball 0 x e x.
-Proof. by move=> epos; split => //; exact: entourage_refl. Qed.
-
-Local Lemma step_ball_center x e : 0 < e -> step_ball x e x.
-Proof. by move=> epos; exists 0%N; apply: n_step_ball_center. Qed.
-
-Local Lemma n_step_ball_triangle n m x y z d1 d2 :
-  n_step_ball n x d1 y ->
-  n_step_ball m y d2 z ->
-  n_step_ball (n + m).+1 x (d1 + d2) z.
-Proof.
-move: n z d2; elim: m => [n z d2 Nxy [? ?]|n IH m z d2 Oxy].
-  by exists y, d1, d2; split; rewrite ?addn0 // (n_step_ball_pos Nxy).
-move=> [w] [e1] [e2] [Oyw ? ? ? <-].
-exists w, (d1 + e1), e2; rewrite addnS addrA.
-split => //; last by rewrite addr_gt0//; exact: n_step_ball_pos Oxy.
-by case: (IH m w e1 Oxy Oyw) => t [e3] [e4] [] Oxt ? ? ? <-; exists t, e3, e4.
-Qed.
-
-Local Lemma step_ball_triangle x y z d1 d2 :
-  step_ball x d1 y -> step_ball y d2 z -> step_ball x (d1 + d2) z.
-Proof.
-move=> [n Oxy] [m Oyz]; exists (n + m).+1.
-exact: n_step_ball_triangle Oxy Oyz.
-Qed.
-
-Local Lemma n_step_ball_sym n x y e :
-  n_step_ball n x e y -> n_step_ball n y e x.
-Proof.
-move: x y e; elim: n; first by move=> ? ? ?; rewrite /= -{1}symG.
-move=> n IH x y e [t] [d1] [d2] [] /IH Oty ? ?.
-rewrite addrC -symG -[n]add0n => gty <-; apply: (n_step_ball_triangle _ Oty).
-by split => //; exact: gty.
-Qed.
-
-Local Lemma step_ball_sym x y e : step_ball x e y -> step_ball y e x.
-Proof. by case=> n /n_step_ball_sym ?; exists n. Qed.
-
-(* Step 3:
-   We prove that step_ball respects the original entourage. This requires an
-   induction on the length of the steps, which is pretty tricky. The central
-   lemma is `split_n_step_ball`, which lets us break a list into parts three
-   parts as: half + one_step + half. Then our we can break apart our n +1 path
-
-                         nlong + one_step
-   into
-                  (half + one_step + half) + one_step
-                                =
-                  half + one_step + (half + one_step)
-
-   and we can we can use our (strong) induction hypothesis.
-   And lastly we finish with splitG3.
-*)
-
-Local Lemma n_step_ball_le n x e1 e2 :
-  e1 <= e2 -> n_step_ball n x e1 `<=` n_step_ball n x e2.
-Proof.
-move: x e1 e2; elim: n.
-  move=> x e1 e2 e1e2 y [?] gxy; split; first exact: (lt_le_trans _ e1e2).
-  by apply: descendG; last (exact: gxy); exact: distN_le.
-move=> n IH x e1 e2 e1e2 z [y] [d1] [d2] [] /IH P d1pos d2pos gyz d1d2e1.
-exists y, (e2 - d2), d2; split => //.
-- by apply: P; rewrite lerBrDr d1d2e1.
-- by apply: lt_le_trans d1pos _; rewrite lerBrDr d1d2e1.
-- by rewrite subrK.
-Qed.
-
-Local Lemma step_ball_le x e1 e2 :
-  e1 <= e2 -> step_ball x e1 `<=` step_ball x e2.
-Proof. by move=> e1e2 ? [n P]; exists n; exact: (n_step_ball_le e1e2). Qed.
-
-Local Lemma distN_half (n : nat) : n.+1%:R^-1 / (2:R) <= n.+2%:R^-1.
-Proof.
-rewrite -invrM //; [exact: unitf_gt0 |exact: unitf_gt0|].
-rewrite lef_pV2 ?posrE // -?natrM ?ler_nat -addn1 -addn1 -addnA mulnDr.
-by rewrite muln1 leq_add2r leq_pmull.
-Qed.
-
-Local Lemma split_n_step_ball n x e1 e2 z :
-  0 < e1 -> 0 < e2 -> n_step_ball n.+1 x (e1 + e2) z ->
-    exists t1 t2 a b,
-    [/\
-      n_step_ball a x e1 t1,
-      n_step_ball 0 t1 (e1 + e2) t2,
-      n_step_ball b t2 e2 z &
-      (a + b = n)%N
-    ].
-Proof.
-move: e1 e2 x z; elim: n.
-  move=> e1 e2 x z e1pos e2pos [y] [d1] [d2] [] Oxy ? ? gd2yz deE.
-  case: (pselect (e1 <= d1)).
-    move=> e1d1; exists x, y, 0%N, 0%N; split.
-    - exact: n_step_ball_center.
-    - apply: n_step_ball_le; last exact: Oxy.
-      by rewrite -deE lerDl; apply: ltW.
-    - by apply: (@n_step_ball_le _ _ d2); rewrite // -(lerD2l e1) -deE lerD.
-    - by rewrite addn0.
-  move=> /negP; rewrite -ltNge//.
-  move=> e1d1; exists y, z, 0%N, 0%N; split.
-  - by apply: n_step_ball_le; last (exact: Oxy); exact: ltW.
-  - by apply: (@n_step_ball_le _ _ d2); rewrite // -deE lerDr ltW.
-  - exact: n_step_ball_center.
-  - by rewrite addn0.
-move=> n IH e1 e2 x z e1pos e2pos [y] [d1] [d2] [] Od1xy d1pos d2pos gd2yz deE.
-case: (pselect (e2 <= d2)).
-  move=> e2d2; exists y, z, n.+1, 0%N; split.
-  - by apply: (@n_step_ball_le _ _ d1); rewrite // -(lerD2r e2) -deE lerD.
-  - by apply: (@n_step_ball_le _ _ d2); rewrite // -deE lerDr; exact: ltW.
-  - exact: n_step_ball_center.
-  - by rewrite addn0.
-have d1E' : d1 = e1 + (e2 - d2) by rewrite addrA -deE addrK.
-move=> /negP; rewrite -ltNge// => d2lee2.
-  case: (IH e1 (e2 - d2) x y); rewrite ?subr_gt0 // -d1E' //.
-  move=> t1 [t2] [c1] [c2] [] Oxy1 gt1t2 t2y <-.
-  exists t1, t2, c1, c2.+1; split => //.
-  - by apply: (@n_step_ball_le _ _ d1); rewrite -?deE // ?lerDl; exact: ltW.
-  - by exists y, (e2 - d2), d2; rewrite // ?subr_gt0// subrK.
-  - by rewrite addnS.
-Qed.
-
-Local Lemma n_step_ball_le_g x n :
-  n_step_ball 0 x n%:R^-1 `<=` [set y | g_ n (x,y)].
-Proof. by move=> y [] ?; rewrite distN_nat. Qed.
-
-Local Lemma subset_n_step_ball n x N :
-  n_step_ball n x N.+1%:R^-1 `<=` [set y | (g_ N) (x, y)].
-Proof.
-move: N x; elim: n {-2}n (leqnn n) => n.
-  rewrite leqn0 => /eqP -> N x; apply: subset_trans.
-    exact: n_step_ball_le_g.
-  by move=> y ?; exact: descendG.
-move=> IH1 + + N x1 x4; case.
-  by move=> ? [?] P; apply: descendG _ P; rewrite distN_nat.
-move=> l ln1 Ox1x4.
-case: (@split_n_step_ball l x1 (N.+1%:R^-1/2) (N.+1%:R^-1/2) x4) => //.
-  by rewrite -splitr.
-move=> x2 [x3] [l1] [l2] [] P1 [? +] P3 l1l2; rewrite -splitr distN_nat => ?.
-have l1n : (l1 <= n)%N by rewrite (leq_trans (leq_addr l2 l1))// l1l2 -ltnS.
-have l2n : (l2 <= n)%N by rewrite (leq_trans (leq_addl l1 l2))// l1l2 -ltnS.
-apply: splitG3; exists x3; [exists x2 => //|].
-  by move/(n_step_ball_le (distN_half N))/(IH1 _ l1n) : P1.
-by move/(n_step_ball_le (distN_half N))/(IH1 _ l2n) : P3.
-Qed.
-
-Local Lemma subset_step_ball x N :
-  step_ball x N.+1%:R^-1 `<=` [set y | (g_ N) (x, y)].
-Proof. by move=> y [] n; exact: subset_n_step_ball. Qed.
-
-Local Lemma step_ball_entourage : entourage = entourage_ step_ball.
-Proof.
-rewrite predeqE => E; split; first last.
-  by case=> e /= epos esubE; apply: (filterS esubE); exact: entourage_nball.
-move=> entE; case: (countableBase entE) => N fN.
-exists N.+2%:R^-1; first by rewrite /= invr_gt0.
-apply: (subset_trans _ fN); apply: subset_trans; last apply: gsubf.
-by case=> x y /= N1ball; apply: (@subset_step_ball x N.+1).
-Qed.
-
-Definition type : Type := let _ := countableBase in let _ := entF in T.
-
-#[export] HB.instance Definition _ := Uniform.on type.
-#[export] HB.instance Definition _ := Uniform_isPseudoMetric.Build R type
-  step_ball_center step_ball_sym step_ball_triangle step_ball_entourage.
-#[export] HB.instance Definition _ {q : Pointed T} :=
-  Pointed.copy type (Pointed.Pack q).
-
-Lemma countable_uniform_bounded (x y : T) : @ball _ type x 2 y.
-Proof.
-rewrite /ball; exists O%N; rewrite /n_step_ball; split; rewrite // /distN.
-rewrite (_ : Num.truncn _ = 0)//.
-by apply/eqP; rewrite truncn_eq// invr_ge0// ler0n/= invf_lt1// ltr1n.
-Qed.
-
-End countable_uniform.
-
-Module Exports. HB.reexport. End Exports.
-End countable_uniform.
-Export countable_uniform.Exports.
-
-Notation countable_uniform := countable_uniform.type.
-
-Definition sup_pseudometric (R : realType) (T : Type) (Ii : Type)
-  (Tc : Ii -> PseudoMetric R T) (Icnt : countable [set: Ii]) : Type := T.
-
-Section sup_pseudometric.
-Variable (R : realType) (T : choiceType) (Ii : Type).
-Variable (Tc : Ii -> PseudoMetric R T).
-
-Hypothesis Icnt : countable [set: Ii].
-
-Local Notation S := (sup_pseudometric Tc Icnt).
-
-Let TS := fun i => PseudoMetric.Pack (Tc i).
-
-Let countable_uniformityT := @countable_sup_ent T Ii Tc Icnt
-  (fun i => @countable_uniformity_metric _ (TS i)).
-
-HB.instance Definition _ : PseudoMetric R S :=
-  PseudoMetric.on (countable_uniform countable_uniformityT).
-
-End sup_pseudometric.
-
-Module gauge.
-Section gauge.
-Local Open Scope relation_scope.
-
-Let split_sym {T : uniformType} (W : set (T * T)) :=
-  (split_ent W) `&` (split_ent W)^-1.
-
-Section entourage_gauge.
-Context {T : uniformType} (E : set (T * T)) (entE : entourage E).
-
-Definition gauge :=
-  filter_from [set: nat] (fun n => iter n split_sym (E `&` E^-1)).
-
-Lemma iter_split_ent j : entourage (iter j split_sym (E `&` E^-1)).
-Proof. by elim: j => [|i IH]; exact: filterI. Qed.
-
-Lemma gauge_ent A : gauge A -> entourage A.
-Proof.
-case=> n; elim: n A; first by move=> ? _ /filterS; apply; apply: filterI.
-by move=> n ? A _ /filterS; apply; apply: filterI; have ? := iter_split_ent n.
-Qed.
-
-Lemma gauge_filter : Filter gauge.
-Proof.
-apply: filter_from_filter; first by exists 0%N.
-move=> i j _ _; wlog ilej : i j / (i <= j)%N.
-  by move=> WH; have [|/ltnW] := leqP i j;
-    [|rewrite (setIC (iter _ _ _))]; exact: WH.
-exists j => //; rewrite subsetI; split => //; elim: j i ilej => [i|j IH i].
-  by rewrite leqn0 => /eqP ->.
-rewrite leq_eqVlt => /predU1P[<-//|/ltnSE/IH]; apply: subset_trans.
-by move=> x/= [jx _]; apply: split_ent_subset => //; exact: iter_split_ent.
-Qed.
-
-Lemma gauge_refl A : gauge A -> diagonal `<=` A.
-Proof.
-case=> n _; apply: subset_trans => -[_ a]/diagonalP ->.
-by apply: entourage_refl; exact: iter_split_ent.
-Qed.
-
-Lemma gauge_inv A : gauge A -> gauge A^-1.
-Proof.
-case=> n _ EA; apply: (@filterS _ _ _ (iter n split_sym (E `&` E^-1))).
-- exact: gauge_filter.
-- by case: n EA; last move=> n; move=> EA [? ?] [/=] ? ?; exact: EA.
-- by exists n .
-Qed.
-
-Lemma gauge_split A : gauge A -> exists2 B, gauge B & B \; B `<=` A.
-Proof.
-case => n _ EA; exists (iter n.+1 split_sym (E `&` E^-1)); first by exists n.+1.
-apply: subset_trans EA; apply: subset_trans; first last.
-  by apply: subset_split_ent; exact: iter_split_ent.
-by case=> a c [b] [] ? ? [] ? ?; exists b.
-Qed.
-
-Let gauged : Type := T.
-
-HB.instance Definition _ := Choice.on gauged.
-HB.instance Definition _ :=
-  @isUniform.Build gauged gauge gauge_filter gauge_refl gauge_inv gauge_split.
-
-Lemma gauge_countable_uniformity : countable_uniformity gauged.
-Proof.
-exists [set iter n split_sym (E `&` E^-1) | n in [set: nat]].
-split; [exact: card_image_le | by move=> W [n] _ <-; exists n|].
-by move=> D [n _ ?]; exists (iter n split_sym (E `&` E^-1)).
-Qed.
-
-Definition type := countable_uniform.type gauge_countable_uniformity.
-End entourage_gauge.
-
-End gauge.
-Module Exports. HB.reexport. End Exports.
-End gauge.
-Export gauge.Exports.
-
-Lemma uniform_pseudometric_sup {R : realType} {T : puniformType} :
-    @entourage T = @sup_ent T {E : set (T * T) | @entourage T E}
-  (fun E => Uniform.class (@gauge.type T (projT1 E) (projT2 E))).
-Proof.
-rewrite eqEsubset; split => [E entE|E].
-  exists E => //=.
-  pose pe : {classic {E0 : set (T * T) | _}} * _ := (exist _ E entE, E).
-  have entPE : `[< @entourage (gauge.type entE) E >].
-    by apply/asboolP; exists 0%N => // ? [].
-  exists (fset1 (exist _ pe entPE)) => //=; first by move=> ?; rewrite in_setE.
-  by rewrite set_fset1 bigcap_set1.
-case=> W /= [/= J] _ <- /filterS; apply; apply: filter_bigI => -[] [] [] /= D.
-move=> entD G /[dup] /asboolP [n _ + _ _] => /filterS; apply.
-exact: gauge.iter_split_ent.
-Qed.
 
 Section perfect_sets.
 

@@ -3,7 +3,7 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra finmap all_classical.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import topology_structure uniform_structure.
+From mathcomp Require Import topology_structure hausdorff uniform_structure.
 From mathcomp Require Import product_topology pseudometric_structure.
 
 (**md**************************************************************************)
@@ -60,7 +60,7 @@ HB.structure Definition OrderNbhs d :=
 
 #[short(type="orderTopologicalType")]
 HB.structure Definition OrderTopological d :=
-  { T of Topological T & Order.Total d T & Order_isNbhs d T }.
+  { T of Hausdorff T & Order.Total d T & Order_isNbhs d T }.
 
 #[short(type="orderUniformType")]
 HB.structure Definition OrderUniform d :=
@@ -69,6 +69,58 @@ HB.structure Definition OrderUniform d :=
 #[short(type="orderPseudoMetricType")]
 HB.structure Definition OrderPseudoMetric d (R : numDomainType) :=
   {T of PseudoMetric R T & OrderTopological d T}.
+
+
+HB.factory Record Order_isTopological d T & Topological T & Order.Total d T := {
+  itv_nbhsE_subproof : forall x : T, nbhs x = filter_from
+    (fun i => itv_open_ends i /\ x \in i)
+    (fun i => [set` i])
+}.
+HB.builders Context d T & Order_isTopological d T.
+
+Let hausdorff : is_hausdorff_space T.
+Proof.
+apply/open_hausdorffP.
+apply: wlog_lt.
+- by move=> ?; rewrite eq_refl.
+- move=> x y hyx; rewrite eq_sym => yx.
+  have [[B A] /= [By Ax] [oB oA dBA]] := hyx yx.
+  exists (A, B) => //=; split=> //.
+  by rewrite disj_set_sym.
+move=> x y xy _.
+case: (EM (exists2 z, (x < z)%O & (z < y)%O)).
+- move=> [z xz zy].
+  exists (`]-oo,z[, `]z,+oo[)%classic => /=.
+    by split; rewrite set_itvE inE/=.
+  rewrite openE/=; split.
+  + move=> t.
+    rewrite {1}set_itvE/= /interior itv_nbhsE_subproof/= => tz.
+    by exists `]-oo,z[.
+  + move=> t.
+    rewrite {1}set_itvE/= /interior itv_nbhsE_subproof/= => zt.
+    exists `]z,+oo[ => //; split=> //.
+    by rewrite in_itv/= zt.
+  + apply/disj_setPLR => t /=.
+    by rewrite !in_itv/= andbT => /lt_trans /[apply]; rewrite ltxx.
+- move=> /forallPNP adj.
+  exists (`]-oo,y[,`]x,+oo[)%classic => /=.
+    by split; rewrite set_itvE inE/=.
+  rewrite openE; split.
+  + move=> t.
+    rewrite {1}set_itvE/= /interior itv_nbhsE_subproof => ty.
+    by exists `]-oo,y[.
+  + move=> t.
+    rewrite {1}set_itvE/= /interior itv_nbhsE_subproof/= => xt.
+    exists `]x,+oo[ => //; split=> //.
+    by rewrite in_itv/= xt.
+  + apply/disj_setPRL => t /=.
+    by rewrite !in_itv/= andbT; exact: adj.
+Qed.
+
+HB.instance Definition _ := Topological_isHausdorff.Build T hausdorff.
+HB.instance Definition _ := Order_isNbhs.Build d T itv_nbhsE_subproof.
+
+HB.end.
 
 Section order_topologies.
 Local Open Scope order_scope.
@@ -245,7 +297,7 @@ exists j; first split.
   by move=> ? ? ? ? <- <-; rewrite itv_setI.
 Qed.
 
-HB.instance Definition _ := Order_isNbhs.Build _ oT order_nbhs_itv.
+HB.instance Definition _ := Order_isTopological.Build _ oT order_nbhs_itv.
 End induced_order_topology.
 
 Lemma min_continuous {d} {T : orderTopologicalType d} :
