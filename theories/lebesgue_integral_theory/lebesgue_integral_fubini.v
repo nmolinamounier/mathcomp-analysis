@@ -588,7 +588,7 @@ rewrite ge0_integral_fsum //.
 apply: eq_fsbigr => i; rewrite inE => -[/= t _ <-{i}].
 under eq_fun do rewrite EFinM.
 rewrite ge0_integralZl//; first exact/measurable_EFinP/measurableT_comp.
- by rewrite -/((m2 \o xsection _) x) -indic_fubini_tonelli_FE.
+by rewrite -/((m2 \o xsection _) x) -indic_fubini_tonelli_FE.
 Qed.
 
 Lemma sfun_measurable_fun_fubini_tonelli_F : measurable_fun [set: T1] F.
