@@ -5,7 +5,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title>Module mathcomp.analysis.measure_theory.measurable_function</title>
-<meta name="description" content="Documentation of Coq module Mathcomp Analysis 00a80bd 2026.10.31-21:43" />
+<meta name="description" content="Documentation of Coq module Mathcomp Analysis 00a80bd 2026.11.01-22:25" />
 <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/markdown-it-deflist/dist/markdown-it-deflist.min.js"></script>
@@ -325,7 +325,17 @@ Qed.</div></details>
 <summary class="toggleproof">Proof.</summary>
 <div class="proofscript">
 <span class="id"> exact</span>. Qed.</div></details>
-<span class="vernacular">Canonical</span><span class="id"> </span><span id="mfun_keyed" class="id"><div name="mfun_keyed" class=" tooltip">mfun_keyed<span class='tooltip-area'><hr/><a href='https://github.com/math-comp/analysis/tree/00a80bdd280330eb64f7eaf6a4ead748c323b46a/theories/measure_theory/measurable_function.v#L73' target='_blank'>Source code</a></span></div></span><span class="id"> :=</span><span class="id"> </span><span class="id"><a href="https://rocq-prover.org/corelib/Corelib.ssr.ssrbool.html#KeyedPred">KeyedPred</a></span><span class="id"> </span><span class="id"><a href="mathcomp.analysis.measure_theory.measurable_function.html#mfun_key">mfun_key</a></span>.<br/>
+<span class="vernacular">Canonical</span><span class="id"> </span><span id="mfun_keyed" class="id"><div name="mfun_keyed" class=" tooltip">mfun_keyed<span class='tooltip-area'><p>dirac :
+forall {d : measure_display} {T : sigmaRingType d},
+T -> forall {R : realFieldType}, set T -> \bar R
+
+dirac is not universe polymorphic
+Arguments dirac {d}%_measure_display_scope {T} a {R} A%_classical_set_scope
+dirac is transparent
+Expands to: Constant mathcomp.analysis.measure_theory.dirac_measure.dirac
+Declared in
+library mathcomp.analysis.measure_theory.dirac_measure, line 33, characters 11-16
+</p><hr/><a href='https://github.com/math-comp/analysis/tree/00a80bdd280330eb64f7eaf6a4ead748c323b46a/theories/measure_theory/measurable_function.v#L73' target='_blank'>Source code</a></span></div></span><span class="id"> :=</span><span class="id"> </span><span class="id"><a href="https://rocq-prover.org/corelib/Corelib.ssr.ssrbool.html#KeyedPred">KeyedPred</a></span><span class="id"> </span><span class="id"><a href="mathcomp.analysis.measure_theory.measurable_function.html#mfun_key">mfun_key</a></span>.<br/>
 <span class="vernacular">End</span><span class="id"> mfun_pred</span>.<br/>
 <br/>
 <span class="vernacular">Section</span><span class="id"> measurable_fun</span>.<br/>
