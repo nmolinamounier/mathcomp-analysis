@@ -138,21 +138,23 @@ Local Open Scope classical_set_scope.
 Local Open Scope ring_scope.
 
 (** Topological spaces *)
-HB.mixin Record Nbhs_isTopological (T : Type) & Nbhs T := {
-  open : set_system T;
+HB.mixin Record Nbhs_hasOpenClosed (T : Type) & Nbhs T := {
+  open : set_system T ;
+  closed : set_system T ;
   nbhs_pfilter_subproof : forall p : T, ProperFilter (nbhs p) ;
   nbhsE_subproof : forall p : T, nbhs p =
     [set A : set T | exists B : set T, [/\ open B, B p & B `<=` A] ] ;
-  openE_subproof : open = [set A : set T | A `<=` nbhs^~ A ]
+  openE_subproof : open = [set A : set T | A `<=` nbhs^~ A ] ;
+  closed_openE_subproof : closed = [set A : set T | open (~` A)]
 }.
 
 #[short(type="topologicalType")]
 HB.structure Definition Topological :=
-  {T of Nbhs T & Nbhs_isTopological T}.
+  {T of Nbhs T & Nbhs_hasOpenClosed T}.
 
 #[short(type="ptopologicalType")]
 HB.structure Definition PointedTopological :=
-  {T of PointedNbhs T & Nbhs_isTopological T}.
+  {T of PointedNbhs T & Nbhs_hasOpenClosed T}.
 
 #[short(type="bpTopologicalType")]
 HB.structure Definition BiPointedTopological :=
@@ -162,7 +164,24 @@ HB.structure Definition BiPointedTopological :=
 HB.structure Definition SubTopological (V : topologicalType)
   (S : pred V) := {U of SubNbhs V S U & Topological U}.
 
-Section Topological1.
+HB.factory Record Nbhs_isTopological (T : Type) & Nbhs T := {
+  open : set_system T;
+  nbhs_pfilter_subproof : forall p : T, ProperFilter (nbhs p) ;
+  nbhsE_subproof : forall p : T, nbhs p =
+    [set A : set T | exists B : set T, [/\ open B, B p & B `<=` A] ] ;
+  openE_subproof : open = [set A : set T | A `<=` nbhs^~ A ]
+}.
+HB.builders Context T & Nbhs_isTopological T.
+
+Let closed := [set A : set T | open (~` A)].
+
+HB.instance Definition _ :=
+  @Nbhs_hasOpenClosed.Build T open closed
+    nbhs_pfilter_subproof nbhsE_subproof openE_subproof erefl.
+
+HB.end.
+
+Section open_interior.
 Context {T : topologicalType}.
 
 Definition open_nbhs (p : T) (A : set T) := open A /\ A p.
@@ -183,6 +202,9 @@ have -> : nbhs p = [set A : set T | exists B, [/\ open B, B p & B `<=` A] ].
 by rewrite predeqE => A; split=> [[B [?]]|[B[]]]; exists B.
 Qed.
 
+Lemma nbhs_singleton (p : T) (A : set T) : nbhs p A -> A p.
+Proof. by rewrite nbhsE => - [? [_ ?]]; apply. Qed.
+
 Lemma open_nbhsE (p : T) (A : set T) : open_nbhs p A = (open A /\ nbhs p A).
 Proof.
 by rewrite nbhsE propeqE; split=> [[? ?]|[? [B [? ?] BA]]]; split => //;
@@ -193,22 +215,8 @@ Definition interior (A : set T) := (@nbhs _ T)^~ A.
 
 Local Notation "A °" := (interior A).
 
-Lemma interior_subset (A : set T) : A° `<=` A.
-Proof.
-by move=> p; rewrite /interior nbhsE => -[? [? ?]]; apply.
-Qed.
-
 Lemma openE : open = [set A : set T | A `<=` A°].
 Proof. exact: openE_subproof. Qed.
-
-Lemma nbhs_singleton (p : T) (A : set T) : nbhs p A -> A p.
-Proof. by rewrite nbhsE => - [? [_ ?]]; apply. Qed.
-
-Lemma nbhs_interior (p : T) (A : set T) : nbhs p A -> nbhs p A°.
-Proof.
-rewrite nbhsE /open_nbhs openE => - [B [Bop Bp] sBA].
-by exists B => // q Bq; apply: filterS sBA _; apply: Bop.
-Qed.
 
 Lemma open0 : open (set0 : set T).
 Proof. by rewrite openE. Qed.
@@ -222,24 +230,55 @@ move=> A B; rewrite openE => Aop Bop p [Ap Bp].
 by apply: filterI; [apply: Aop|apply: Bop].
 Qed.
 
-Lemma bigcup_open (I : Type) (D : set I) (f : I -> set T) :
+Lemma openU : setU_closed (@open T).
+Proof.
+by move=> A B /[!openE] AA BB p [/AA|/BB]; apply: filterS => ? ?; [left|right].
+Qed.
+
+Lemma open_bigcup (I : Type) (D : set I) (f : I -> set T) :
   (forall i, D i -> open (f i)) -> open (\bigcup_(i in D) f i).
 Proof.
 rewrite openE => fop p [i Di].
 by have /fop fiop := Di; move/fiop; apply: filterS => ??; exists i.
 Qed.
 
+Lemma open_bigsetI (I : Type) (r : seq I) (P : pred I) (f : I -> set T) :
+  (forall i, P i -> open (f i)) ->
+  open (\big[setI/setT]_(i <- r | P i) f i).
+Proof. by move=> hf; apply: big_ind => //; [ exact: openT | exact: openI ]. Qed.
+
+Lemma finite_open_bigcap (I : choiceType) (D : set I) (f : I -> set T) :
+  finite_set D -> (forall i, D i -> open (f i)) -> open (\bigcap_(i in D) f i).
+Proof.
+move=> /[dup] fD /(bigsetI_fset_set f) <- hf.
+rewrite big_seq; apply: open_bigsetI => i.
+by rewrite in_fset_set// inE; exact: hf.
+Qed.
+
+#[deprecated(since="analysis 1.20.0", use=finite_open_bigcap)]
 Lemma bigcap_open (F : (set T) ^nat) :
   (forall i, open (F i)) ->
   forall i, open (\bigcap_(j < i) F j).
+Proof. by move=> oF i; apply: finite_open_bigcap. Qed.
+
+Lemma open_nbhsT (p : T) : open_nbhs p setT.
+Proof. by split=> //; apply: openT. Qed.
+
+Lemma open_nbhsI (p : T) : setI_closed (open_nbhs p).
+Proof. by move=> A B [Aop Ap] [Bop Bp]; split => //; exact: openI. Qed.
+
+Lemma open_nbhs_nbhs (p : T) (A : set T) : open_nbhs p A -> nbhs p A.
+Proof. by rewrite nbhsE => p_A; exists A. Qed.
+
+Lemma interior_subset (A : set T) : A° `<=` A.
 Proof.
-move=> HU; elim; [rewrite bigcap_mkord big_ord0; apply: openT|move=> n IH].
-by rewrite bigcap_mkord big_ord_recr -bigcap_mkord; apply: openI.
+by move=> p; rewrite /interior nbhsE => -[? [? ?]]; apply.
 Qed.
 
-Lemma openU : setU_closed (@open T).
+Lemma nbhs_interior (p : T) (A : set T) : nbhs p A -> nbhs p A°.
 Proof.
-by move=> A B /[!openE] AA BB p [/AA|/BB]; apply: filterS => ? ?; [left|right].
+rewrite nbhsE /open_nbhs openE => - [B [Bop Bp] sBA].
+by exists B => // q Bq; apply: filterS sBA _; apply: Bop.
 Qed.
 
 Lemma open_subsetE (A B : set T) : open A -> (A `<=` B) = (A `<=` B°).
@@ -255,55 +294,92 @@ rewrite openE => p; rewrite /interior nbhsE => - [B [Bop Bp]].
 by rewrite open_subsetE //; exists B.
 Qed.
 
-Lemma interior_bigcup I (D : set I) (f : I -> set T) :
-  \bigcup_(i in D) (f i)° `<=` (\bigcup_(i in D) f i)°.
+Lemma interiorE (A : set T) : A° = \bigcup_(U in open `&` [set V | V `<=` A]) U.
 Proof.
-move=> p [i Di]; rewrite /interior nbhsE => - [B [Bop Bp] sBfi].
-by exists B => // ? /sBfi; exists i.
+apply/seteqP; split => [x Aox|x [U [oU /= +] Ux]].
+- by exists A° => //; split; [ exact: open_interior | exact: interior_subset ].
+- by rewrite open_subsetE//; apply.
 Qed.
 
-Lemma open_nbhsT (p : T) : open_nbhs p setT.
-Proof. by split=> //; apply: openT. Qed.
+Lemma interior_id (A : set T) : open A <-> A° = A.
+Proof.
+split=> [|<-]; last exact: open_interior.
+by rewrite seteqP openE/=; apply: conj; exact: interior_subset.
+Qed.
 
-Lemma open_nbhsI (p : T) : setI_closed (open_nbhs p).
-Proof. by move=> A B [Aop Ap] [Bop Bp]; split => //; exact: openI. Qed.
+Lemma interior0 : interior (@set0 T) = set0.
+Proof. by apply/interior_id; exact: open0. Qed.
 
-Lemma open_nbhs_nbhs (p : T) (A : set T) : open_nbhs p A -> nbhs p A.
-Proof. by rewrite nbhsE => p_A; exists A. Qed.
+Lemma interiorT : interior [set: T] = [set: T].
+Proof. by apply/interior_id; exact: openT. Qed.
+
+Lemma interiorS (A B : set T) : A `<=` B -> A° `<=` B°.
+Proof.
+rewrite -open_subsetE; first exact: open_interior.
+by apply: subset_trans; exact: interior_subset.
+Qed.
 
 Lemma interiorI (A B : set T) : (A `&` B)° = A° `&` B°.
 Proof.
-rewrite /interior predeqE => //= x; rewrite nbhsE; split => [[B0 ?] | []].
-- by rewrite subsetI => // -[? ?]; split; exists B0.
-- by move=> -[B0 ? ?] [B1 ? ?]; exists (B0 `&` B1);
-  [exact: open_nbhsI | rewrite subsetI; split; apply: subIset; [left|right]].
+apply/seteqP; split.
+- by rewrite subsetI; split; apply: interiorS.
+- rewrite -open_subsetE; first by apply: openI; exact: open_interior.
+  by apply: setISS; exact: interior_subset.
 Qed.
 
-End Topological1.
+Lemma interiorU (A B : set T) : A° `|` B° `<=` (A `|` B)°.
+Proof. by rewrite subUset; split; apply: interiorS. Qed.
+
+Lemma interior_bigcup I (D : set I) (f : I -> set T) :
+  \bigcup_(i in D) (f i)° `<=` (\bigcup_(i in D) f i)°.
+Proof.
+rewrite -open_subsetE; first by apply: open_bigcup => ? _; exact: open_interior.
+by apply: subset_bigcup => ? _; exact: interior_subset.
+Qed.
+
+Lemma interior_bigsetI I (r : seq I) (P : pred I) (f : I -> set T) :
+  (\big[setI/setT]_(i <- r | P i) (f i))° 
+    = \big[setI/setT]_(i <- r | P i) (f i)°.
+Proof. by apply: big_endo; [ exact: interiorI | exact: interiorT ]. Qed.
+
+Lemma finite_interior_bigcapE (I : choiceType) (D : set I) (f : I -> set T) :
+  finite_set D -> 
+  (\bigcap_(i in D) f i)° = \bigcap_(i in D) (f i)°.
+Proof.
+move=> /[dup] /(bigsetI_fset_set f) <- /(bigsetI_fset_set (interior \o f)) <-.
+exact: interior_bigsetI.
+Qed.
+
+Lemma interior_bigcap I (D : set I) (f : I -> set T) :
+  (\bigcap_(i in D) f i)° `<=` \bigcap_(i in D) (f i)°.
+Proof. by apply: sub_bigcap => ? ?; apply: interiorS; apply: bigcap_inf. Qed.
+
+End open_interior.
+
+Reserved Notation "A ^°" (at level 1, format "A ^°").
+Notation "A °" := (interior A) : classical_set_scope.
+#[deprecated(since="mathcomp-analysis 1.10.0", note="use the notation instead ° instead of ^°")]
+Notation "A ^°" := (A°) (only parsing).
+
+#[deprecated(since="analysis 1.20.0",use=open_bigcup)]
+Notation bigcup_open := open_bigcup.
+
+Lemma meets_openr {T : topologicalType} (F : set_system T) (x : T) :
+  F `#` nbhs x = F `#` open_nbhs x.
+Proof.
+rewrite propeqE; split; [exact/meetsSr/open_nbhs_nbhs|].
+by move=> P A B {}/P P; rewrite nbhsE => -[B' /P + sB]; apply: subsetI_neq0.
+Qed.
+
+Lemma meets_openl {T : topologicalType} (F : set_system T) (x : T) :
+  nbhs x `#` F = open_nbhs x `#` F.
+Proof. by rewrite meetsC meets_openr meetsC. Qed.
 
 Lemma open_in_nearW {T : topologicalType} (P : T -> Prop) (S : set T) :
   open S -> {in S, forall x, P x} -> {in S, forall x, \forall x0 \near x, P x0}.
 Proof.
 by move=> oS SP z /set_mem Sz; apply: in_nearW SP => //=; exact: open_nbhs_nbhs.
 Qed.
-
-#[global] Hint Extern 0 (Filter (nbhs _)) =>
-  solve [apply: nbhs_filter] : typeclass_instances.
-#[global] Hint Extern 0 (ProperFilter (nbhs _)) =>
-  solve [apply: nbhs_pfilter] : typeclass_instances.
-
-Global Instance alias_nbhs_filter {T : topologicalType} x :
-  @Filter T^o (@nbhs T^o T x).
-Proof. apply: @nbhs_filter T x. Qed.
-
-Global Instance alias_nbhs_pfilter {T : topologicalType} x :
-  @ProperFilter T^o (@nbhs T^o T x).
-Proof. exact: @nbhs_pfilter T x. Qed.
-
-Reserved Notation "A ^°" (at level 1, format "A ^°").
-Notation "A °" := (interior A) : classical_set_scope.
-#[deprecated(since="mathcomp-analysis 1.10.0", note="use the notation instead ° instead of ^°")]
-Notation "A ^°" := (A°) (only parsing).
 
 Lemma continuousP (S T : topologicalType) (f : S -> T) :
   continuous f <-> forall A, open A -> open (f @^-1` A).
@@ -320,11 +396,6 @@ rewrite !openE => fcont Dop x /= Dfx.
 by apply: fcont; [rewrite inE|exact: Dop].
 Qed.
 
-Lemma cvg_fmap {T : topologicalType} {U : topologicalType}
-  (F : set_system T) x (f : T -> U) :
-   {for x, continuous f} -> F --> x -> f @ F --> f x.
-Proof. by move=> cf fx P /cf /fx. Qed.
-
 Lemma near_join (T : topologicalType) (x : T) (P : set T) :
   (\forall x0 \near x, P x0) -> \forall x0 \near x, \forall x1 \near x0, P x1.
 Proof. exact: nbhs_interior. Qed.
@@ -337,6 +408,283 @@ Proof.
 move=> PQ xP; near=> y; apply: (near PQ y) => //;
 exact: (near (near_join xP) y).
 Unshelve. all: by end_near. Qed.
+
+Section closed_closure.
+Context (T : topologicalType).
+
+Lemma closed_openE : closed = [set A : set T | open (~` A)].
+Proof. exact: closed_openE_subproof. Qed.
+
+Lemma open_closedE : open = [set A : set T | closed (~` A)].
+Proof. by rewrite closed_openE/=; under eq_set do rewrite setCK. Qed.
+
+Lemma closed0 : closed (set0 : set T).
+Proof. by rewrite closed_openE/= setC0; exact: openT. Qed.
+
+Lemma closedT : closed [set: T].
+Proof. by rewrite closed_openE/= setCT; exact: open0. Qed.
+
+Lemma closedI : setI_closed (@closed T).
+Proof. by move=> ? ?; rewrite !closed_openE/= setCI; exact: openU. Qed.
+
+Lemma closedU : setU_closed (@closed T).
+Proof. by move=> ? ?; rewrite !closed_openE/= setCU; exact: openI. Qed.
+
+Lemma closed_bigcap (I : Type) (D : set I) (f : I -> set T) :
+  (forall i, D i -> closed (f i)) -> closed (\bigcap_(i in D) f i).
+Proof. by rewrite closed_openE/= setC_bigcap; exact: open_bigcup. Qed.
+
+Lemma closed_bigsetU {I : eqType} (s : seq I) (F : I -> set T) : 
+  (forall x, x \in s -> closed (F x)) ->
+  closed (\big[setU/set0]_(x <- s) F x).
+Proof.
+move=> scF; rewrite big_seq.
+by apply: big_ind => //; [exact: closed0|exact: closedU].
+Qed.
+
+Lemma finite_closed_bigcup {I : choiceType} (A : set I) (F : I -> set T) :
+  finite_set A -> (forall i, A i -> closed (F i)) ->
+  closed (\bigcup_(i in A) F i).
+Proof.
+move=> finA cF; rewrite -bigsetU_fset_set//; apply: closed_bigsetU => i.
+by rewrite in_fset_set// inE; exact: cF.
+Qed.
+
+Lemma open_closedC (D : set T) : open D -> closed (~` D).
+Proof. by rewrite open_closedE. Qed.
+
+Lemma closed_openC (D : set T) : closed D -> open (~` D).
+Proof. by rewrite closed_openE. Qed.
+
+Lemma closedE : closed = [set A : set T | forall p, ~ (\forall x \near p, ~ A x) -> A p].
+Proof.
+rewrite closed_openE openE/= predeqE => A /=.
+by rewrite subsetCPl.
+Qed.
+
+Lemma closedC (D : set T) : closed (~` D) = open D.
+Proof. by rewrite open_closedE. Qed.
+
+Lemma openC (D : set T) : open (~` D) = closed D.
+Proof. by rewrite closed_openE. Qed.
+
+Definition closure (A : set T) :=
+  [set p : T | forall B, nbhs p B -> A `&` B !=set0].
+
+Lemma closureEnbhs A : closure A = [set p | globally A `#` nbhs p].
+Proof. by under eq_fun do rewrite meets_globallyl. Qed.
+
+Lemma closureEonbhs A : closure A = [set p | globally A `#` open_nbhs p].
+Proof. by under eq_fun do rewrite -meets_openr meets_globallyl. Qed.
+
+Lemma subset_closure (A : set T) : A `<=` closure A.
+Proof. by move=> p ??; exists p; split=> //; apply: nbhs_singleton. Qed.
+
+Lemma closure_eq0 (A : set T) : closure A = set0 -> A = set0.
+Proof.
+by move=> A0; apply/seteqP; split => //; rewrite -A0; exact: subset_closure.
+Qed.
+
+Lemma closed_closure (A : set T) : closed (closure A).
+Proof.
+rewrite closed_openE/= openE/=.
+move=> p /existsNP[B] /not_implyP[Bn] 
+  /nonemptyPn /disjoints_subset /subsetCPr BnA.
+have Bon : nbhs p B° by apply: nbhs_interior.
+by apply: filterS Bon => x Box /(_ _ Box) [? [+ /BnA]].
+Qed.
+
+Lemma closureE (A : set T) : closure A = smallest closed A.
+Proof.
+rewrite eqEsubset; split; last first.
+  by move=> ?; apply; split; [ exact: closed_closure | exact: subset_closure ].
+move=> x; contra => -[B [/closed_openC ocB AB] nBx].
+exists (~` B); first by apply: open_nbhs_nbhs.
+by move=> ? /AB ?; apply.
+Qed.
+
+Lemma closedP E : closed E -> closure E `<=` E.
+Proof. by rewrite closureE => cE; apply: smallest_sub. Qed.
+
+Lemma closureS A B : A `<=` B -> closure A `<=` closure B.
+Proof. by move=> ? ? CAx ?; move/CAx; exact/subsetI_neq0. Qed.
+
+Lemma closure_id E : closed E <-> closure E = E.
+Proof.
+split=> [?|<-]; last exact: closed_closure.
+by rewrite closureE; apply: smallest_id.
+Qed.
+
+Lemma closed_subsetE A B : closed B -> (A `<=` B) = (closure A `<=` B).
+Proof.
+move=> cB; apply/propeqP; split; last first.
+  by apply: subset_trans; exact: subset_closure.
+by move/closure_id: cB => {2}<-; exact: closureS.
+Qed.
+
+Lemma closure0 : closure (@set0 T) = set0.
+Proof. by apply/closure_id; exact: closed0. Qed.
+
+Lemma closureT : closure [set: T] = [set: T].
+Proof. by apply/closure_id; exact: closedT. Qed.
+
+Lemma closureI (A B : set T) : closure (A `&` B) `<=` closure A `&` closure B.
+Proof. by rewrite subsetI; split; apply: closureS. Qed.
+
+Lemma closureU (A B : set T) : closure (A `|` B) = closure A `|` closure B.
+Proof.
+apply/seteqP; split.
+  rewrite -closed_subsetE; first by apply: closedU; exact: closed_closure.
+  by apply: setUSS; exact: subset_closure.
+by rewrite subUset; split; apply: closureS.
+Qed.
+
+Lemma closure_bigcap I (D : set I) (f : I -> set T) :
+  closure (\bigcap_(i in D) f i) `<=` \bigcap_(i in D) closure (f i).
+Proof.
+rewrite -closed_subsetE. 
+  by apply: closed_bigcap => ? _; exact: closed_closure.
+by apply: subset_bigcap => ? _; exact: subset_closure.
+Qed.
+
+Lemma closure_bigsetU I (r : seq I) (P : pred I) (f : I -> set T) :
+  closure (\big[setU/set0]_(i <- r | P i) f i) 
+    = \big[setU/set0]_(i <- r | P i) closure (f i).
+Proof. by apply: big_morph; [ exact: closureU | exact: closure0 ]. Qed.
+
+Lemma finite_closure_bigcup (I : choiceType) (D : set I) (f : I -> set T) :
+  finite_set D ->
+  closure (\bigcup_(i in D) f i) = \bigcup_(i in D) closure (f i).
+Proof.
+move=> /[dup] /(bigsetU_fset_set f) <- /(bigsetU_fset_set (closure \o f)) <-.
+exact: closure_bigsetU.
+Qed.
+
+Lemma closure_bigcup I (D : set I) (f : I -> set T) :
+  \bigcup_(i in D) closure (f i) `<=` closure (\bigcup_(i in D) f i).
+Proof. by apply: bigcup_sub => ? ?; apply: closureS; apply: bigcup_sup. Qed.
+
+Definition limit_point E := [set t : T |
+  forall U, nbhs t U -> exists y, [/\ y != t, E y & U y]].
+
+Lemma limit_pointEnbhs E :
+  limit_point E = [set p | globally (E `\ p) `#` nbhs p].
+Proof.
+under eq_fun do rewrite meets_globallyl; rewrite funeqE => p /=.
+apply/eq2_forall => x px; apply/eq_exists => y.
+by rewrite propeqE; split => [[/eqP ? ?]|[[? /eqP ?]]]; do 2?split.
+Qed.
+
+Lemma limit_pointEonbhs E :
+  limit_point E = [set p | globally (E `\ p) `#` open_nbhs p].
+Proof. by rewrite limit_pointEnbhs; under eq_fun do rewrite meets_openr. Qed.
+
+Lemma subset_limit_point E : limit_point E `<=` closure E.
+Proof. by move=> t Et U tU; have [p [? ? ?]] := Et _ tU; exists p. Qed.
+
+Lemma not_limit_pointE A a : (~ limit_point A a) =
+  exists2 X : set T, nbhs a X & A `&` X `<=` [set a].
+Proof.
+rewrite /limit_point/= -existsNE exists2E; apply: eq_exists => X/=.
+rewrite not_implyE -forallNE; congr and; apply: eq_forall => t/=.
+rewrite and3E not_andE (propext (rwP negP)) negbK implyE orC.
+by rewrite -(propext (rwP eqP)).
+Qed.
+
+Definition isolated (A : set T) (x : T) :=
+  x \in A /\ exists2 V, nbhs x V & V `&` A = [set x].
+
+Lemma isolatedS (A : set T) : isolated A `<=` A.
+Proof. by move=> x [/set_mem]. Qed.
+
+Lemma disjoint_isolated_limit_point (A : set T) :
+  [disjoint isolated A & limit_point A].
+Proof.
+apply/disj_setPS => t [[At [V tV]]] /[swap].
+move/(_ _ tV) => [x [xt Ax Vx]].
+have /[swap] -> : [set x] `<=` V `&` A by move=> ? ->; split.
+move/subset_set1 => [/seteqP[/(_ _ erefl)//]|].
+by move=> /seteqP[_ /(_ _ erefl)/=]; apply/eqP; rewrite eq_sym.
+Qed.
+
+Lemma closure_isolated_limit_point (A : set T) :
+  closure A = isolated A `|` limit_point A.
+Proof.
+apply/seteqP; split=> [t At0|t [|]].
+- rewrite /setU/= -implyNp => /not_andP[tA U /At0[x [Ux Ax]]|+ U tU].
+    by exists x; split => //; contra: tA => <-; exact/mem_set.
+  move/forall2NP => /(_ U)[//|/seteqP/not_andP[|]].
+    by contra => H x [Ux Ax]; apply/eqP/negPn/negP => /H /(_ Ax).
+  have [At tUA|At _] := pselect (A t).
+    by absurd: tUA => _ ->; split => //; exact: nbhs_singleton.
+  have [x [Ax Ux]] := At0 _ tU.
+  by exists x; split => //; contra: At => <-.
+- by move/isolatedS; exact: subset_closure.
+- exact: subset_limit_point.
+Qed.
+
+Lemma closureC A : closure (~` A) = ~` A°.
+Proof.
+rewrite closureE /smallest interiorE setC_bigcup -(bigcap_image _ setC id).
+apply: eq_bigcapl; split.
+- move=> F [/closed_openC ocF /subsetCl cFA]; exists (~` F) => //.
+  by rewrite setCK.
+- by move=> _ [U [/open_closedC ccU /= /subsetC UA] <-].
+Qed.
+
+Lemma interiorC A : (~` A)° = ~` closure A.
+Proof. by rewrite -{2}[A]setCK closureC setCK. Qed.
+
+End closed_closure.
+
+Lemma preimage_closed {T U : topologicalType} (f : T -> U) (D : set U) :
+  {in ~` f @^-1` D, continuous f} -> closed D -> closed (f @^-1` D).
+Proof.
+rewrite !closedE => f_continuous D_cl x /= xDf.
+apply: D_cl; apply: contra_not xDf => fxD.
+have NDfx : ~ D (f x).
+  by move: fxD; rewrite -nbhs_nearE nbhsE => - [A [? ?]]; exact.
+by apply: f_continuous fxD; rewrite inE.
+Qed.
+#[deprecated(since="mathcomp-analysis 1.16.0", note="renamed to `preimage_closed`")]
+Notation closed_comp := preimage_closed (only parsing).
+
+Lemma closed_cvg {T} {V : topologicalType} {F} {FF : ProperFilter F}
+    (u_ : T -> V) (A : V -> Prop) :
+    (* BUG: elim does not see this as an elimination principle if A : set V *)
+    closed A -> (\forall n \near F, A (u_ n)) ->
+  forall l, u_ @ F --> l -> A l.
+Proof.
+move=> /closedP + FAu_ l u_Fl; apply => B /u_Fl; rewrite nbhs_filterE.
+by move=> /(filterI FAu_) => /filter_ex[t [Au_t u_Bt]]; exists (u_ t).
+Qed.
+Arguments closed_cvg {T V F FF u_} _ _ _ _ _.
+
+Lemma continuous_closedP (S T : topologicalType) (f : S -> T) :
+  continuous f <-> forall A, closed A -> closed (f @^-1` A).
+Proof.
+rewrite continuousP; split=> ctsf ? ?.
+  by rewrite -openC preimage_setC; apply: ctsf; rewrite openC.
+by rewrite -closedC preimage_setC; apply: ctsf; rewrite closedC.
+Qed.
+
+#[global] Hint Extern 0 (Filter (nbhs _)) =>
+  solve [apply: nbhs_filter] : typeclass_instances.
+#[global] Hint Extern 0 (ProperFilter (nbhs _)) =>
+  solve [apply: nbhs_pfilter] : typeclass_instances.
+
+Global Instance alias_nbhs_filter {T : topologicalType} x :
+  @Filter T^o (@nbhs T^o T x).
+Proof. apply: @nbhs_filter T x. Qed.
+
+Global Instance alias_nbhs_pfilter {T : topologicalType} x :
+  @ProperFilter T^o (@nbhs T^o T x).
+Proof. exact: @nbhs_pfilter T x. Qed.
+
+Lemma cvg_fmap {T : topologicalType} {U : topologicalType}
+  (F : set_system T) x (f : T -> U) :
+   {for x, continuous f} -> F --> x -> f @ F --> f x.
+Proof. by move=> cf fx P /cf /fx. Qed.
 
 (* limit composition *)
 
@@ -562,12 +910,82 @@ HB.instance Definition _ := Nbhs_isTopological.Build T
 
 HB.end.
 
+Definition nbhs_of_closed (T : Type) (cl : set_system T) (p : T) (A : set T) :=
+  exists C, [/\ cl C, (~` C) p & ~` C `<=` A].
+
+HB.factory Record isClosedTopological T & Choice T := {
+  cl : set_system T ;
+  cl0 : cl set0 ;
+  clU : setU_closed cl ;
+  cl_bigI : forall (I : Type) (f : I -> set T), 
+    (forall i, cl (f i)) -> cl (\bigcap_i f i)
+}.
+HB.builders Context T & isClosedTopological T.
+
+HB.instance Definition _ := hasNbhs.Build T (nbhs_of_closed cl).
+
+Let clT : cl setT.
+Proof.
+have <- : \bigcap_(i : False) setT = [set: T] by apply: bigcapT.
+by apply: cl_bigI.
+Qed.
+
+Let op : set_system T := [set U | cl (~` U)].
+
+Let nbhs_pfilter_subproof (p : T) : ProperFilter (nbhs p).
+Proof.
+apply: Build_ProperFilter_ex.
+  by move=> V [C [_cC nCp cCV]]; exists p; apply: cCV.
+split; first by exists set0; split=> //; exact: cl0.
+  move=> A B [C [cC nCp cCA]] [D [cD nDp cDB]].
+  exists (C `|` D); split; first by apply: clU.
+  - by rewrite setCU.
+  - by rewrite setCU; apply: setISS.
+move=> P Q PQ [C [cC nCp cCP]].
+by exists C; split=> //; apply: subset_trans PQ.
+Qed. 
+
+Let nbhsE_subproof (p : T) :
+  nbhs p = [set A | exists B, [/\ op B, B p & B `<=` A] ].
+Proof.
+rewrite /op predeqE => A /=; split.
+- move=> [C [cC nCp cCA]].
+  by exists (~` C); split=> //; rewrite setCK.
+- move=> [B [ccB Bp BA]].
+  by exists (~` B); split=> //; rewrite setCK.
+Qed.
+
+Let openE_subproof : op = [set A : set T | A `<=` nbhs^~ A].
+Proof.
+rewrite predeqE /op /nbhs /= => A; split.
+  by move=> ccA x Ax; exists (~` A); split=> //; rewrite setCK.
+move=> A_sub_int.
+have : forall x, exists C, A x -> [/\ cl C, (~` C) x & ~` C `<=` A].
+  move=> x; case: (EM (A x)) => [|?]; last by exists set0.
+  by move/A_sub_int => [C hC]; exists C.
+move=> /choice[f hf].
+suff -> : ~` A = \bigcap_(x in A) f x.
+  rewrite bigcap_mkcond; apply: cl_bigI => x.
+  by case: ifP => [/set_mem /hf[] //|_]; exact: clT.
+apply/seteqP; split.
+  by apply: sub_bigcap => x /hf[_ _ /subsetCl].
+apply: subsetCr => x /[dup] Ax /hf[_ nfxx _].
+by rewrite setC_bigcap; exists x.
+Qed.
+
+Let closed_openE_subproof : cl = [set A | op (~` A)].
+Proof. by rewrite /op/=; under eq_set do rewrite setCK. Qed.
+
+HB.instance Definition _ := Nbhs_hasOpenClosed.Build T
+  nbhs_pfilter_subproof nbhsE_subproof openE_subproof closed_openE_subproof.
+
+HB.end.
+
 Definition openU_from (T : Type) (I : Type) (D : set I) (b : I -> set T) :=
   [set \bigcup_(i in D') b i | D' in subset^~ D].
 
 #[deprecated(since="mathcomp-analysis 1.17.0", use=openU_from)]
 Notation open_from := openU_from (only parsing).
-
 
 (** Topology defined by a base of open sets *)
 
@@ -629,7 +1047,6 @@ HB.instance Definition _ := isOpenTopological.Build T
 
 HB.end.
 
-
 HB.factory Record isSubBaseTopological T & Choice T := {
   I : pointedType ;
   D : set I ;
@@ -663,6 +1080,63 @@ HB.instance Definition _ := isBaseTopological.Build T
   finI_from_cover finI_from_join.
 
 HB.end.
+
+Definition closedI_from (T : Type) (I : Type) (D : set I) (b : I -> set T) :=
+  [set \bigcap_(i in D') b i | D' in subset^~ D].
+
+HB.factory Record isClosedBaseTopological T & Choice T := {
+  I : pointedType ;
+  D : set I ;
+  b : I -> set T ;
+  b_emptyI : \bigcap_(i in D) b i = set0 ;
+  b_meet : forall i j t, D i -> D j -> ~ b i t -> ~ b j t ->
+    exists k, [/\ D k, ~ b k t & b i `|` b j `<=` b k]
+}.
+HB.builders Context T & isClosedBaseTopological T.
+
+Local Notation cl := (closedI_from D b).
+
+Let cl0 : cl set0.
+Proof. by exists D => //; exact: b_emptyI. Qed.
+
+Let clU : setU_closed cl.
+Proof.
+move=> A B [D1 D1D D1I] [D2 D2D D2I].
+exists [set i | D i /\ A `|` B `<=` b i]; first by move=> ? [].
+apply/seteqP; split; last first.
+  rewrite subUset -D1I -D2I; split.
+  - move=> x + i [Di +].
+    by rewrite subUset => + [+ _] => /[swap]; exact. 
+  - move=> x + i [Di +].
+    by rewrite subUset => + [_ +] => /[swap]; exact.
+apply/subsetCP; rewrite setCU => x []. 
+rewrite -{1}D1I -{1}D2I !setC_bigcap => - [i D1i nbi] [j D2j nbj].
+have [k [Dk nbk bUs]] := b_meet (D1D _ D1i) (D2D _ D2j) nbi nbj.
+exists k => //=; split=> // y [Ay|By]; apply: bUs; [ left | right ].
+- suff : A `<=` b i by apply.
+  by rewrite -D1I; apply: bigcap_inf.
+- suff : B `<=` b j by apply.
+  by rewrite -D2I; apply: bigcap_inf.
+Qed.
+
+Let cl_bigI J (f : J -> set T) :
+  (forall i : J, cl (f i)) -> cl (\bigcap_i f i).
+Proof.
+rewrite /cl/=; under [X in X -> _]eq_forall do rewrite exists2E.
+move=> /choice[g /all_and2[gD gI]].
+exists (\bigcup_i g i); first by apply: bigcup_sub.
+under [RHS]eq_bigcapr do rewrite -gI.
+apply/seteqP; split; apply: sub_bigcap.
+- by move=> j _ x + i gji; apply; exists j.
+- by move=> i [j _ gji] x /(_ j); apply.
+Qed.
+
+HB.instance Definition _ := isClosedTopological.Build T cl0 clU cl_bigI.
+
+HB.end.
+
+(* [set \bigcap_(i in [set` D']) f i |
+    D' in [set A : {fset I} | {subset A <= D}]] *)
 
 (** deleted neighborhood *)
 
@@ -712,16 +1186,6 @@ Qed.
 
 (** meets *)
 
-Lemma meets_openr {T : topologicalType} (F : set_system T) (x : T) :
-  F `#` nbhs x = F `#` open_nbhs x.
-Proof.
-rewrite propeqE; split; [exact/meetsSr/open_nbhs_nbhs|].
-by move=> P A B {}/P P; rewrite nbhsE => -[B' /P + sB]; apply: subsetI_neq0.
-Qed.
-
-Lemma meets_openl {T : topologicalType} (F : set_system T) (x : T) :
-  nbhs x `#` F = open_nbhs x `#` F.
-Proof. by rewrite meetsC meets_openr meetsC. Qed.
 (** Closed sets in topological spaces *)
 
 Section Closed.
@@ -866,37 +1330,6 @@ Proof. by move=> p clclAp B /nbhs_interior /clclAp [q [clAq /clAq]]. Qed.
 End Closed.
 #[deprecated(since="mathcomp-analysis 1.15.0", note="use `closure_isolated_limit_point` instead")]
 Notation closure_limit_point := __deprecated__closure_limit_point (only parsing).
-
-Lemma preimage_closed {T U : topologicalType} (f : T -> U) (D : set U) :
-  {in ~` f @^-1` D, continuous f} -> closed D -> closed (f @^-1` D).
-Proof.
-rewrite !closedE => f_continuous D_cl x /= xDf.
-apply: D_cl; apply: contra_not xDf => fxD.
-have NDfx : ~ D (f x).
-  by move: fxD; rewrite -nbhs_nearE nbhsE => - [A [? ?]]; exact.
-by apply: f_continuous fxD; rewrite inE.
-Qed.
-#[deprecated(since="mathcomp-analysis 1.16.0", note="renamed to `preimage_closed`")]
-Notation closed_comp := preimage_closed (only parsing).
-
-Lemma closed_cvg {T} {V : topologicalType} {F} {FF : ProperFilter F}
-    (u_ : T -> V) (A : V -> Prop) :
-    (* BUG: elim does not see this as an elimination principle if A : set V *)
-    closed A -> (\forall n \near F, A (u_ n)) ->
-  forall l, u_ @ F --> l -> A l.
-Proof.
-move=> + FAu_ l u_Fl; apply => B /u_Fl /=; rewrite nbhs_filterE.
-by move=> /(filterI FAu_) => /filter_ex[t [Au_t u_Bt]]; exists (u_ t).
-Qed.
-Arguments closed_cvg {T V F FF u_} _ _ _ _ _.
-
-Lemma continuous_closedP (S T : topologicalType) (f : S -> T) :
-  continuous f <-> forall A, closed A -> closed (f @^-1` A).
-Proof.
-rewrite continuousP; split=> ctsf ? ?.
-  by rewrite -openC preimage_setC; apply: ctsf; rewrite openC.
-by rewrite -closedC preimage_setC; apply: ctsf; rewrite closedC.
-Qed.
 
 Lemma closedU (T : topologicalType) : setU_closed (@closed T).
 Proof. by move=> E D; rewrite -?openC setCU; exact: openI. Qed.
