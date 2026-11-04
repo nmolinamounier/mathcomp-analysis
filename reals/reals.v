@@ -118,16 +118,11 @@ End has_bound_lemmas.
 
 (* -------------------------------------------------------------------- *)
 
-HB.mixin Record ArchimedeanField_isReal R & Num.ArchiRealField R := {
-  sup_upper_bound_subdef : forall E : set R,
-    has_sup E -> ubound E (supremum 0 E) ;
-  sup_adherent_subdef : forall (E : set R) (eps : R),
-    0 < eps -> has_sup E -> exists2 e : R, E e & (supremum 0 E - eps) < e
-}.
-
 #[short(type=realType)]
-HB.structure Definition Real := {R of ArchimedeanField_isReal R
-  & Num.ArchiRealField R & Num.RealClosedField R}.
+HB.structure Definition Real := {R of 
+  Num.ArchiRealField R & Num.RealClosedField R 
+  & DedekindPOrder ring_display R
+  & DedekindPOrder_ZeroSupInf0 R}.
 
 Bind Scope ring_scope with Real.sort.
 
