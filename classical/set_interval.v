@@ -3,7 +3,7 @@ From HB Require Import structures.
 From mathcomp Require Import boot order ssralg ssrnum interval.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets functions.
+From mathcomp Require Import boolp classical_sets sup_inf functions.
 
 (**md**************************************************************************)
 (* # Sets and Intervals                                                       *)
@@ -509,31 +509,17 @@ Proof.
 by split=> [[x /lb_ubN] | [x /ub_lbN]]; [|rewrite setNK]; exists (- x).
 Qed.
 
+Lemma has_ub_lbN E : has_ubound E <-> has_lbound (-%R @` E).
+Proof.
+rewrite has_lb_ubN image_comp /comp /=.
+by under eq_fun do rewrite opprK; rewrite image_id.
+Qed.
+
 End subr_image.
 
 Section interval_hasNbound.
 Context {R : realDomainType}.
 Implicit Types (E : set R) (x : R).
-
-Lemma has_ubPn {E} : ~ has_ubound E <-> (forall x, exists2 y, E y & x < y).
-Proof.
-split; last first.
-  move=> h [x] /ubP hle; case/(_ x): h => y /hle.
-  by rewrite leNgt => /negbTE ->.
-move/forallNP => h x; have {h} := h x.
-move=> /ubP /existsNP => -[y /not_implyP[Ey /negP]].
-by rewrite -ltNge => ltx; exists y.
-Qed.
-
-Lemma has_lbPn E : ~ has_lbound E <-> (forall x, exists2 y, E y & y < x).
-Proof.
-split=> [/has_lb_ubN /has_ubPn NEnub x|Enlb /has_lb_ubN].
-  have [y ENy ltxy] := NEnub (- x); exists (- y); rewrite 1?ltrNl //.
-  by case: ENy => z Ez <-; rewrite opprK.
-apply/has_ubPn => x; have [y Ey ltyx] := Enlb (- x).
-exists (- y); last by rewrite ltrNr.
-by exists y => //; rewrite opprK.
-Qed.
 
 Lemma hasNlbound_itv (a : itv_bound R) : a != -oo%O ->
   ~ has_lbound [set` Interval -oo%O a].

@@ -1239,6 +1239,15 @@ apply/predeqP => x; split=> [[a ? [b ? <-]]|[[a b] [? ? <-]]]/=;
 by [exists (a, b) | exists a => //; exists b].
 Qed.
 
+Lemma image2_sym {TA TB rT : Type} (A : set TA) (B : set TB) 
+    (f : TA -> TB -> rT) :
+  [set f x y | x in A & y in B] = [set f x y | y in B & x in A].
+Proof.
+rewrite predeqE => z /=; split.
+- by move=> [a ? [b ? <-]]; exists b => //; exists a.
+- by move=> [b ? [a ? <-]]; exists a => //; exists b.
+Qed.
+
 Lemma set_nil (T : eqType) : [set` [::]] = @set0 T.
 Proof. by rewrite predeqP. Qed.
 
