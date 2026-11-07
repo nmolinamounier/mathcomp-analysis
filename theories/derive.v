@@ -6,7 +6,7 @@ From mathcomp Require Import poly sesquilinear.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp contra classical_sets functions reals.
-From mathcomp Require Import topology tvs normedtype landau.
+From mathcomp Require Import sup_inf topology tvs normedtype landau.
 
 (**md**************************************************************************)
 (* # Differentiation                                                          *)
@@ -1597,15 +1597,15 @@ Lemma compact_EVT_max (T : topologicalType) (R : realType) (f : T -> R)
   exists2 c, c \in A & forall t, t \in A -> f t <= f c.
 Proof.
 move=> A0 cA cf.
-have sup_fA : has_sup (f @` A).
+have [f0 ubf] : has_sup (f @` A).
   by apply/compact_has_sup; [exact: image_nonempty A0|exact/continuous_compact].
 have [|imf_ltsup] := pselect (exists2 c, c \in A & f c = sup (f @` A)).
   move=> [c cinA fcsupfA]; exists c => // t tA; rewrite fcsupfA.
-  by apply/sup_upper_bound => //; exact/imageP/set_mem.
+  by apply: ub_le_sup => //; exact/imageP/set_mem.
 have {}AfsupfA t : t \in A -> f t < sup (f @` A).
   move=> tA; have [//|supfAft] := ltrP (f t) (sup (f @` A)).
   rewrite falseE; apply: imf_ltsup; exists t => //.
-  apply/eqP; rewrite eq_le supfAft andbT sup_upper_bound//.
+  apply/eqP; rewrite eq_le supfAft andbT ub_le_sup//.
   exact/imageP/set_mem.
 pose g t : R := (sup (f @` A) - f t)^-1.
 have invf_continuous : {within A, continuous g}.

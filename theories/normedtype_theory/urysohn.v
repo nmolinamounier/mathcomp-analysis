@@ -5,8 +5,8 @@ From mathcomp Require Import interval_inference.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp classical_sets functions set_interval.
-From mathcomp Require Import reals.
-From mathcomp Require Import topology ereal edist num_normedtype normed_module.
+From mathcomp Require Import sup_inf reals ereal edist.
+From mathcomp Require Import topology num_normedtype normed_module.
 
 (**md**************************************************************************)
 (* # Urysohn's lemma                                                          *)
@@ -44,6 +44,7 @@ Context (A B : set T) (E : set (T * T)).
 Hypothesis entE : entourage E.
 Hypothesis AB0 : A `*` B `&` E = set0.
 
+Import Dedekind.TBOrder.
 Local Notation T' := [the pseudoMetricType R of gauge.type entE].
 
 Local Lemma urysohn_separation : exists (f : T -> R),
@@ -63,7 +64,7 @@ have [->|/set0P[a A0]] := eqVneq A set0.
   - by move=> ? [? ? <-].
 have dfin x : @edist_inf R T' A x \is a fin_num.
   rewrite ge0_fin_numE ?edist_inf_ge0 //; apply: le_lt_trans.
-    by apply: ereal_inf_lbound; exists a.
+    by apply: lb_ge_inf; exists a.
   rewrite -ge0_fin_numE ?edist_ge0 //; apply/edist_finP => /=; exists 2 => //.
   exact: countable_uniform.countable_uniform_bounded.
 pose f' := (fun z => fine (@edist_inf R T' A z)) \min (fun=> eps%:num).
@@ -81,7 +82,7 @@ pose f z := (f' z)/eps%:num; exists f; split.
   by rewrite /f ler_pdivrMr // mul1r /f' /= ge_min lexx orbT.
 - by move=> ? [z Az] <-; rewrite /f/f' /= edist_inf0 // fine0 min_l// mul0r.
 - move=> ? [b Bb] <-; rewrite /f /f'/=; case: ltP; rewrite ?divff//.
-  rewrite -lte_fin fineK// => /ereal_inf_lt [_ [z Az <-]] ebz.
+  rewrite -lte_fin fineK// => /gt_inf_ex [_ [z Az <-]] ebz.
   by have [] := exy _ _ Az Bb; exact/ball_sym/(@edist_lt_ball R T' _ (b, z)).
 Qed.
 

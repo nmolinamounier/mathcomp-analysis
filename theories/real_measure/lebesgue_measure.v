@@ -5,7 +5,7 @@ From mathcomp Require Import interval interval_inference archimedean rat.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp classical_sets functions cardinality fsbigop
-  reals.
+  reals sup_inf.
 From mathcomp Require Import topology ereal numfun normedtype sequences
   esum measure.
 From mathcomp Require Export lebesgue_stieltjes_measure measurable_realfun.
@@ -149,8 +149,7 @@ move=> /subset_itvP ij; apply: leeB => /=.
 have [lj /=|lj] := asboolP (has_lbound J); last by rewrite leNye.
 have [li /=|li] := asboolP (has_lbound I); last first.
   by move: li; have := subset_has_lbound ij lj.
-rewrite lee_fin lerNl opprK supS// ?has_inf_supN//; first exact/nonemptyN.
-by move=> r/= [s Is <-]; exists s => //; exact: ij.
+by rewrite lee_fin infS.
 Qed.
 
 Lemma le_hlength : {homo hlength : A B / (A `<=` B) >-> A <= B}.
@@ -396,7 +395,7 @@ have coverE s : (0 < s)%R ->
    exists2 A, @measurable_cover _ (ocitv_type R) E A &
    \sum_(0 <= k <oo) hlength (A k) < completed_mu E + s%:E.
   move=> s0; have : mu E \is a fin_num by rewrite ge0_fin_numE.
-  by move/lb_ereal_inf_adherent => /(_ _ s0)[_/= [A EA] <-] ?; exists A.
+  by move/fin_inf_adherent => /(_ _ s0)[_/= [A EA] <-] ?; exists A.
 pose A n := projT1 (cid2 (coverE _ (inv0 n))).
 have mA k : @measurable_cover _ (ocitv_type R) E (A k).
   by rewrite /A; case: cid2.
@@ -432,7 +431,7 @@ have coverEF s : (0 < s)%R ->
   have : mu (F `\` E) \is a fin_num.
     rewrite ge0_fin_numE// (@le_lt_trans _ _ (mu F))//; last by rewrite -muEF.
     by apply: le_outer_measure; exact: subDsetl.
-  by move/lb_ereal_inf_adherent => /(_ _ s0)[_/= [B FEB] <-] ?; exists B.
+  by move/fin_inf_adherent => /(_ _ s0)[_/= [B FEB] <-] ?; exists B.
 pose B n := projT1 (cid2 (coverEF _ (inv0 n))).
 have mB k : @measurable_cover _ (ocitv_type R) (F `\` E) (B k).
   by rewrite /B; case: cid2.
@@ -848,7 +847,7 @@ Section negligible_outer_measure.
 Context {R : realType}.
 Implicit Types (A : set R).
 Local Open Scope ereal_scope.
-Import MeasurableR.
+Import MeasurableR Dedekind.TBOrder.
 Let l := (@wlength R idfun).
 Let mu := (@lebesgue_measure R).
 
@@ -862,7 +861,7 @@ have [F AF Fe] : exists2 I_, open_itv_cover A I_ &
     \sum_(0 <= k <oo) l (I_ k) <= (l^* A)%mu + e%:E.
   have : (l^* A)%mu\is a fin_num by rewrite ge0_fin_numE ?outer_measure_ge0.
   rewrite outer_measure_open_itv_cover.
-  move=> /lb_ereal_inf_adherent-/(_ _ e0)[_/= [F]] AF <- Fe.
+  move=> /fin_inf_adherent-/(_ _ e0)[_/= [F]] AF <- Fe.
   by exists F => //; exact/ltW.
 exists (\bigcup_i F i); split.
 - apply: bigcup_open => // i _.
@@ -876,13 +875,13 @@ exists (\bigcup_i F i); split.
 Qed.
 
 Lemma outer_measure_open A : (l^* A)%mu =
-  ereal_inf [set (l^* U)%mu | U in [set U | open U /\ A `<=` U]].
+  inf [set (l^* U)%mu | U in [set U | open U /\ A `<=` U]].
 Proof.
 apply/eqP; rewrite eq_le; apply/andP; split.
-  by apply: le_ereal_inf_tmp => /= _ /= [U [oU AU] <-]; exact: le_outer_measure.
-apply/lee_addgt0Pr => /= e e0; apply: ge_ereal_inf.
+  by apply: le_inf => /= _ /= [U [oU AU] <-]; exact: le_outer_measure.
+apply/lee_addgt0Pr => /= e e0; apply: ge_inf.
 have [U [oU AU UAe]] := @outer_measure_open_le A _ e0.
-by exists (mu U) => //=; exists U.
+by exists (mu U); split=> //=; exists U.
 Qed.
 
 Lemma outer_measure_Gdelta A :
@@ -923,7 +922,7 @@ End negligible_outer_measure.
 Section lebesgue_regularity.
 Local Open Scope ereal_scope.
 Context {R : realType}.
-Import MeasurableR.
+Import MeasurableR Dedekind.TBOrder.
 Let mu : measure _ _ := @lebesgue_measure R.
 
 Lemma lebesgue_regularity_outer (D : set R) (eps : R) :
@@ -931,7 +930,7 @@ Lemma lebesgue_regularity_outer (D : set R) (eps : R) :
   exists U : set R, [/\ open U , D `<=` U & mu (U `\` D) < eps%:E].
 Proof.
 move=> mD muDoo epspos.
-have /ereal_inf_lt[z [/= M' covDM sMz zDe]] : mu D < mu D + (eps / 2)%:E.
+have /gt_inf_ex[z [/= M' covDM sMz zDe]] : mu D < mu D + (eps / 2)%:E.
   by rewrite lte_spaddre ?lte_fin ?divr_gt0// ge0_fin_numE.
 pose e2 n := ((eps / 2) / (2 ^ n.+1)%:R)%R.
 have e2pos n : (0 < e2 n)%R by rewrite ?divr_gt0.
@@ -1064,19 +1063,19 @@ Qed.
 
 Let lebesgue_regularity_innerE_bounded (A : set R) : measurable A ->
   mu A < +oo ->
-  mu A = ereal_sup [set mu K | K in [set K | compact K /\ K `<=` A]].
+  mu A = sup [set mu K | K in [set K | compact K /\ K `<=` A]].
 Proof.
 move=> mA muA; apply/eqP; rewrite eq_le; apply/andP; split; last first.
-  by apply: ge_ereal_sup => /= x [B /= [cB BA <-{x}]]; exact: le_outer_measure.
+  by apply: ge_sup => /= x [B /= [cB BA <-{x}]]; exact: le_outer_measure.
 apply/lee_addgt0Pr => e e0.
 have [B [cB BA /= ABe]] := lebesgue_regularity_inner mA muA e0.
 rewrite -{1}(setDKU BA) (@le_trans _ _ (mu B + mu (A `\` B)))//.
   by rewrite setUC outer_measureU2.
-by rewrite leeD//; [apply: ereal_sup_ubound => /=; exists B|exact/ltW].
+by rewrite leeD//; [apply: ub_le_sup => /=; exists B|exact/ltW].
 Qed.
 
 Lemma lebesgue_regularity_inner_sup (D : set R) : measurable D ->
-  mu D = ereal_sup [set mu K | K in [set K | compact K /\ K `<=` D]].
+  mu D = sup [set mu K | K in [set K | compact K /\ K `<=` D]].
 Proof.
 move=> mD; have [?|] := ltP (mu D) +oo.
   exact: lebesgue_regularity_innerE_bounded.
@@ -1097,7 +1096,7 @@ have [] := @lebesgue_regularity_inner (F N `&` D) _ _ _ ltr01.
 - by rewrite (le_lt_trans _ (ffin N).2)//= measureIl.
 move=> V [/[dup] /compact_measurable mV cptV VFND] FDV1 M1FD.
 rewrite (@le_trans _ _ (mu V))//; last first.
-  apply: ereal_sup_ubound; exists V => //=; split => //.
+  apply: ub_le_sup; exists V => //=; split => //.
   exact: (subset_trans VFND (@subIsetr _ _ _)).
 rewrite -(@leeD2rE _ 1)// -EFinD (le_trans M1FD)//.
 rewrite /mu (@measureDI _ _ _ _ (F N `&` D) _ _ mV)/=; first exact: measurableI.

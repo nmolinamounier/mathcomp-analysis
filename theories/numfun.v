@@ -5,7 +5,7 @@ From mathcomp Require Import interval_inference finmap.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp classical_sets fsbigop functions cardinality
-  set_interval reals.
+  set_interval reals sup_inf.
 From mathcomp Require Import topology ereal normedtype sequences.
 
 (**md**************************************************************************)

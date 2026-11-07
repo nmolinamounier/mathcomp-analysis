@@ -1,7 +1,7 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
 From mathcomp Require Import boot order algebra.
-From mathcomp Require Import boolp classical_sets functions.
+From mathcomp Require Import boolp classical_sets functions sup_inf.
 From mathcomp Require Import reals ereal topology normedtype sequences.
 From mathcomp Require Import measure real_measure.
 
@@ -20,7 +20,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Import Order.TTheory GRing.Theory Num.Def Num.Theory.
+Import Order.TTheory GRing.Theory Num.Def Num.Theory Dedekind.TBOrder.
 Import numFieldNormedType.Exports.
 
 Local Open Scope classical_set_scope.
@@ -32,9 +32,9 @@ Context d {T : semiRingOfSetsType d} {R : realType}.
 Variable mu : {measure set T -> \bar R}.
 Implicit Type f : T -> \bar R.
 
-Definition ess_sup f := ereal_inf [set y | \forall x \ae mu, f x <= y].
+Definition ess_sup f := inf [set y | \forall x \ae mu, f x <= y].
 
-Lemma ess_supEae f : ess_sup f = ereal_inf [set y | \forall x \ae mu, f x <= y].
+Lemma ess_supEae f : ess_sup f = inf [set y | \forall x \ae mu, f x <= y].
 Proof. by []. Qed.
 
 End essential_supremum.
@@ -63,14 +63,14 @@ Qed.
 Local Notation ess_sup := (ess_sup mu).
 
 Lemma ess_supEmu0 f : measurable_fun [set: T] f ->
-   ess_sup f = ereal_inf [set y | mu (f @^-1` `]y, +oo[) = 0].
+   ess_sup f = inf [set y | mu (f @^-1` `]y, +oo[) = 0].
 Proof.
-by move=> ?; congr (ereal_inf _); apply/predeqP => r; exact: ae_le_measureP.
+by move=> ?; congr (inf _); apply/predeqP => r; exact: ae_le_measureP.
 Qed.
 
 Lemma ess_sup_ge f : \forall x \ae mu, f x <= ess_sup f.
 Proof.
-rewrite ess_supEae//; set I := (X in ereal_inf X).
+rewrite ess_supEae//; set I := (X in inf X).
 have [->|IN0] := eqVneq I set0.
   by rewrite ereal_inf0; apply: nearW => ?; rewrite leey.
 have [u uI uinf] := ereal_inf_seq IN0.
@@ -81,7 +81,7 @@ Unshelve. all: by end_near. Qed.
 
 Lemma ess_supP f y : reflect (\forall x \ae mu, f x <= y) (ess_sup f <= y).
 Proof.
-apply: (iffP (ereal_inf_leP _)) => /=; last 2 first.
+apply: (iffP (ge_infP _)) => /=; last 2 first.
 - by move=> [z fz zy]; near do apply: le_trans zy.
 - by move=> fy; exists y.
 by rewrite -ess_supEae//; exact: ess_sup_ge.

@@ -3,7 +3,7 @@ From mathcomp Require Import boot order finmap ssralg ssrnum ssrint.
 From mathcomp Require Import interval interval_inference archimedean rat.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets functions.
+From mathcomp Require Import boolp classical_sets functions sup_inf.
 From mathcomp Require Import cardinality set_interval reals real_interval
   topology.
 
@@ -921,8 +921,8 @@ Proof.
 move=> iX lX uX; rewrite eqEsubset; split; first exact: right_bounded_interior.
 rewrite -(open_subsetE _ (@open_lt _ _)) => r rsupX.
 move/has_lbPn : lX => /(_ r)[y Xy yr].
-have hsX : has_sup X by split => //; exists y.
-have /sup_adherent/(_ hsX)[e Xe] : 0 < sup X - r by rewrite subr_gt0.
+have Xne : X !=set0 by exists y.
+have /sup_adherent/(_ Xne)[e Xe] : 0 < sup X - r by rewrite subr_gt0.
 by rewrite subKr => re; apply: (iX y e); rewrite ?ltW.
 Qed.
 
@@ -932,8 +932,8 @@ Proof.
 move=> iX lX uX; rewrite eqEsubset; split; first exact: left_bounded_interior.
 rewrite -(open_subsetE _ (@open_gt _ _)) => r infXr.
 move/has_ubPn : uX => /(_ r)[y Xy yr].
-have hiX : has_inf X by split => //; exists y.
-have /inf_adherent/(_ hiX)[e Xe] : 0 < r - inf X by rewrite subr_gt0.
+have Xne : X !=set0 by exists y.
+have /inf_adherent/(_ Xne)[e Xe] : 0 < r - inf X by rewrite subr_gt0.
 by rewrite addrC subrK => er; apply: (iX e y); rewrite ?ltW.
 Qed.
 
@@ -947,11 +947,9 @@ rewrite -open_subsetE; first exact: (@interval_open _ (BRight _) (BLeft _)).
 move=> r /andP[iXr rsX].
 have [X0|/set0P X0] := eqVneq X set0.
   by move: (lt_trans iXr rsX); rewrite X0 inf_out ?sup_out ?ltxx // => - [[]].
-have hiX : has_inf X by split.
-have /inf_adherent/(_ hiX)[e Xe] : 0 < r - inf X by rewrite subr_gt0.
+have /inf_adherent/(_ X0)[e Xe] : 0 < r - inf X by rewrite subr_gt0.
 rewrite addrC subrK => er.
-have hsX : has_sup X by split.
-have /sup_adherent/(_ hsX)[f Xf] : 0 < sup X - r by rewrite subr_gt0.
+have /sup_adherent/(_ X0)[f Xf] : 0 < sup X - r by rewrite subr_gt0.
 by rewrite subKr => rf; apply: (iX e f); rewrite ?ltW.
 Qed.
 

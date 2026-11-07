@@ -7,7 +7,7 @@
 From mathcomp Require Import boot order algebra.
 From mathcomp Require Import bigenough.
 From mathcomp Require Import boolp classical_sets functions
-  constructive_ereal reals.
+  constructive_ereal reals sup_inf.
 From mathcomp Require Import xfinmap discrete.
 
 Set Implicit Arguments.
@@ -531,14 +531,14 @@ Lemma nlim_sup (u : nat -> R) l :
 Proof.
 move=> mn_u cv_ul; set S := (X in sup X); suff: ncvg u (sup S)%:E.
   by move/nlimE; move/nlimE: cv_ul => -> [->].
-elim/nbh_finW=> /= e gt0_e; have sS: has_sup S.
+elim/nbh_finW=> /= e gt0_e; have [Sne Sub]: has_sup S.
   split; first exists (u 0%N).
     by exists 0%N.
   exists l; apply/ubP => _ [n ->].
   by rewrite -lee_fin; apply/ncvg_homo_le.
-have /sup_adherent := sS => /(_ _ gt0_e) [r] [N ->] lt_uN.
+move: Sne => /(sup_adherent gt0_e) [r] [N ->] lt_uN.
 exists N => n le_Nn; rewrite !inE distrC ger0_norm ?subr_ge0.
-  by move/ubP : (sup_upper_bound sS) => -> //; exists n.
+  by move/ubP : (ub_le_sup Sub) => -> //; exists n.
 by rewrite ltrBlDr -ltrBlDl (lt_le_trans lt_uN) ?mn_u.
 Qed.
 

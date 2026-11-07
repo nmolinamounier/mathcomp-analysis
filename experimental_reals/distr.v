@@ -5,7 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 From mathcomp Require Import boot order algebra.
-From mathcomp Require Import boolp classical_sets.
+From mathcomp Require Import boolp classical_sets sup_inf.
 From mathcomp Require Import constructive_ereal reals.
 From mathcomp Require Import xfinmap discrete realseq realsum.
 

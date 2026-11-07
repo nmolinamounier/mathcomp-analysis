@@ -5,7 +5,7 @@ From mathcomp Require Import boot order finmap ssralg ssrnum ssrint
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp classical_sets filter functions cardinality
-  set_interval.
+  set_interval sup_inf.
 From mathcomp Require Import reals real_interval ereal topology convex
   tvs num_normedtype ereal_normedtype pseudometric_normed_Zmodule.
 
@@ -461,7 +461,7 @@ Lemma limf_esup_dnbhsN {R : realType} (f : R -> \bar R) (a : R) :
   limf_esup f a^' = limf_esup (fun x => f (- x)%R) (- a)%R^'.
 Proof.
 rewrite /limf_esup dnbhsN image_comp/=.
-congr (ereal_inf [set _ | _ in _]); apply/funext => A /=.
+congr (inf [set _ | _ in _]); apply/funext => A /=.
 rewrite image_comp/= -compA (_ : _ \o _ = idfun)// funeqE => x/=.
 by rewrite opprK.
 Qed.
@@ -1460,11 +1460,11 @@ Proof.
 move=> x Xx/=; rewrite in_itv/=.
 case: (asboolP (has_lbound _)) => ?; case: (asboolP (has_ubound _)) => ? //=.
 + by case: asboolP => ?; case: asboolP => ? //=;
-     rewrite !(lteifF,lteifT,ub_le_sup,ge_inf,sup_ub_strict,inf_lb_strict).
+    rewrite ?(lteifT,lteifF,ub_le_sup,lb_ge_inf,sup_ub_strict,inf_lb_strict).
++ by case: asboolP => ?;
+     rewrite !(lteifF,lteifT,ub_le_sup,lb_ge_inf,sup_ub_strict,inf_lb_strict).
 + by case: asboolP => XinfX; rewrite !(lteifF, lteifT);
-     [rewrite ge_inf | rewrite inf_lb_strict].
-+ by case: asboolP => XsupX; rewrite !(lteifF, lteifT);
-     [rewrite ub_le_sup | rewrite sup_ub_strict].
+    rewrite ?ub_le_sup// ?sup_ub_strict.
 Qed.
 
 Lemma is_intervalP (X : set R) : is_interval X <-> X = [set x | x \in Rhull X].
@@ -1616,7 +1616,7 @@ have [|] := asboolP (has_lbound A) => lA; last first.
     by rewrite ax xb.
   have [As|NAs]/= := asboolP (A _) => xA.
     by apply: (Iitv a (sup A)); by [apply: AI | rewrite ltW ?ax].
-  have [||b Ab xb] := @sup_gt _ A x; do ?by [exists a | rewrite (itvP xA)].
+  have [||b Ab xb] := @lt_sup_ex _ _ A x; do ?by [exists a | rewrite (itvP xA)].
   have /is_intervalPlt/(_ a b) := Iitv; apply; do ?by apply: AI.
   by rewrite ax xb.
 have [|]:= asboolP (has_ubound A) => uA; last first.
@@ -1624,24 +1624,26 @@ have [|]:= asboolP (has_ubound A) => uA; last first.
   move=> /existsNP[Ab /negP]; rewrite -ltNge => xb.
   have [Ai|NAi]/= := asboolP (A _) => xA.
     by apply: (Iitv (inf A) b); by [apply: AI | rewrite (ltW xb)].
-  have [||a Aa ax] := @inf_lt _ A x; do ?by [exists b | rewrite (itvP xA)].
+  have [||a Aa ax] := @gt_inf_ex _ _ A x; do ?by [exists b | rewrite (itvP xA)].
   have /is_intervalPlt/(_ a b) := Iitv; apply; do ?by apply: AI.
   by rewrite ax xb.
 have [Ai|NAi]/= := asboolP (A _); have [As|NAs]/= := asboolP (A _).
 - by apply: Iitv; apply: AI.
 - move=> xA.
-  have [||b Ab xb] := @sup_gt _ A x; do ?by [exists (inf A) | rewrite (itvP xA)].
+  have [||b Ab xb] := @lt_sup_ex _ _ A x
+    ; do ?by [exists (inf A) | rewrite (itvP xA)].
   have /(_ (inf A) b) := Iitv; apply; do ?by apply: AI.
   by rewrite (itvP xA) (ltW xb).
 - move=> xA.
-  have [||a Aa ax] := @inf_lt _ A x; do ?by [exists (sup A) | rewrite (itvP xA)].
+  have [||a Aa ax] := @gt_inf_ex _ _ A x
+    ; do ?by [exists (sup A) | rewrite (itvP xA)].
   have /(_ a (sup A)) := Iitv; apply; do ?by apply: AI.
   by rewrite (itvP xA) (ltW ax).
 have [->|/set0P AN0] := eqVneq A set0.
   by rewrite inf0 sup0 itv_ge//= ltBSide/= ltxx.
 move=> xA.
-have [||a Aa ax] := @inf_lt _ A x; do ?by [|rewrite (itvP xA)].
-have [||b Ab xb] := @sup_gt _ A x; do ?by [|rewrite (itvP xA)].
+have [||a Aa ax] := @gt_inf_ex _ _ A x; do ?by [|rewrite (itvP xA)].
+have [||b Ab xb] := @lt_sup_ex _ _ A x; do ?by [|rewrite (itvP xA)].
 have /is_intervalPlt/(_ a b) := Iitv; apply; do ?by apply: AI.
 by rewrite ax xb.
 Qed.
@@ -2412,7 +2414,7 @@ suff [p_idx [pUq Up]] : exists p_idx,
 pose P := [pred i : 'I_(f q).+1 | ratr (g i) \in bigcup_ointsub U q].
 have Pord_max : P ord_max.
   by rewrite /P/= cfg// bigcup_ointsubxx//; exact/set_mem.
-pose min : 'I_(f q).+1 := [arg min_(i < ord_max | P i) idfun i].
+pose min : 'I_(f q).+1 := [arg min_(i < ord_max | P i) idfun i]%N.
 exists min => /=; split.
 - by rewrite /min; case: arg_minnP.
 - move=> q' pUp; rewrite /min; case: arg_minnP => //= i giq ismall.

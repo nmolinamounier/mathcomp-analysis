@@ -4,7 +4,7 @@ From mathcomp Require Import boot order ssralg ssrnum vector.
 From mathcomp Require Import interval_inference finmap.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets functions cardinality.
+From mathcomp Require Import boolp classical_sets functions cardinality sup_inf.
 From mathcomp Require Import convex set_interval reals topology.
 From mathcomp Require Import initial_topology num_normedtype.
 From mathcomp Require Import pseudometric_normed_Zmodule.
@@ -1277,14 +1277,14 @@ have [->|]:= eqVneq A set0.
 set P : set K := (X in inf X).
 move/set0P/A0 => {}A0.
 apply/eqP; rewrite eq_le; apply/andP; split; last first.
-  apply: lb_le_inf.
+  apply: le_inf.
     exists 1; rewrite /P/= ltr01 inE/=; split => //.
     by exists 0 => //; rewrite scale1r.
   by move=> z; rewrite /P /= => -[z0] _; rewrite ltW.
 have infle (r : K) : 0 < r -> inf P <= r.
   move=> r0.
   have Pr : P r by split => //; rewrite inE; exists 0 => //; rewrite scaler0.
-  by apply: ge_inf => //; exists 0 => z /= [] z0 _; rewrite ltW.
+  by apply: lb_ge_inf => //; exists 0 => z /= [] z0 _; rewrite ltW.
 by apply/ler_addgt0Pl => /= r r0; rewrite addr0; exact: infle.
 Qed.
 
@@ -1292,7 +1292,7 @@ Qed.
 Proof.
 rewrite /gauge_fun; set P := (X in inf X).
 have [->|/set0P P0] := eqVneq P set0; first by rewrite inf0.
-by apply: lb_le_inf => // z; rewrite /P /= => -[] z0 _; rewrite ltW.
+by apply: le_inf => // z; rewrite /P /= => -[] z0 _; rewrite ltW.
 Qed.
 
 #[local] Lemma ler_gaugeD x y : gauge_fun (x + y) <= gauge_fun x + gauge_fun y.
@@ -1313,10 +1313,11 @@ have [/= r' r0' /set_mem Ary] := absorbA y.
 have [/= r2 r20' /set_mem Arxy] := absorbA (x + y).
 rewrite -inf_sumE; first by apply: ex_has_inf; exists r.
   by apply: ex_has_inf; exists r'.
-apply: infS; first by apply: ex_has_inf; exists r2.
-  exists (r^-1 + r'^-1), r^-1 => /=.
+apply: infS.
+- exists (r^-1 + r'^-1), r^-1 => /=.
     by rewrite invr_gt0 mem_scaleV.
   by exists r'^-1 => //=; rewrite invr_gt0 mem_scaleV.
+- by apply ex_has_inf; exists r2.
 move=> z /= [t [t0 /set_mem[v Av tvx [s [s0 /set_mem[w Aw swy] <-]]]]].
 rewrite addr_gt0//; split => //; rewrite inE/= -swy -tvx.
 exists ((t + s)^-1 *: (t *: v + s *: w)).
@@ -1557,8 +1558,9 @@ Let ball_gauge_fun (A : set E) (r : R) (r0 : 0 < r)
   (gauge_fun absA pabsA) @^-1` ball (0 : R) r =
   (fun y : E => r^-1 *: y) @^-1` A.
 Proof.
-apply/seteqP; split => y /=; rewrite /ball/= sub0r normrN ger0_norm ?gauge_ge0//.
-  move/inf_lt => [].
+apply/seteqP; split => y /=
+  ; rewrite /ball/= sub0r normrN ger0_norm ?gauge_ge0//.
+  move/gt_inf_ex => [].
   have [r' r'0 /set_mem r'yb] := pabsA y.
   exists r'^-1 => /=; split; first by rewrite invr_gt0.
     rewrite inE /=; exists (r' *: y) => //.
@@ -1591,7 +1593,8 @@ have lepr : - (t * r) <= sup (-%R @` [set s | 0 < s /\ y \in ( *:%R s ) @` A]).
     by rewrite (scalerA t^-1) -invfM scalerA divff ?scale1r// gt_eqF// mulr_gt0.
   have: has_ubound B by exists 0 => ? [s [s0 _]] <-; rewrite ltW // oppr_lt0.
   by move/ub_le_sup/(_ _ Br).
-apply: le_lt_trans; first by rewrite lerNl; exact lepr.
+apply: le_lt_trans.
+  rewrite /gauge_fun infEN lerNl; exact: lepr.
 by rewrite gtr_pMl.
 Qed.
 
@@ -1683,12 +1686,11 @@ have [qx0|qx0] := eqVneq (q x) 0.
     rewrite linearZ /= normrM normfV ltr_pdivrMl ?normr_gt0 ?lt0r_neq0//.
     rewrite (gtr0_norm e0) => /(_ _)/lt_trans; apply; last first.
       by rewrite gtr_pMr ?invf_lt1 ?ltrDl.
-    have hasinf : has_inf [set r | 0 < r /\ x \in ( *:%R r) @` b].
-      split; last by exists 0 => z /= [z0 _]; exact: ltW.
+    have hasx_ne : [set r | 0 < r /\ x \in ( *:%R r) @` b] !=set0.
       have [r r0 /set_mem bx] := absorbing_opennbhsbasis Bb x.
       exists r^-1 => /=; split; rewrite ?invr_gt0//; apply/mem_set.
       by exists (r *: x) => //; rewrite scalerA ?mulVf ?lt0r_neq0 ?scale1r.
-    have [eps [eps0 /set_mem /= [y by' epsyx]]] := inf_adherent e0 hasinf.
+    have [eps [eps0 /set_mem /= [y by' epsyx]]] := inf_adherent e0 hasx_ne.
     rewrite qx0 add0r -epsyx scalerA => epse; rewrite ?mulVf.
     have /(_ (e^-1 * eps)) := ((open_absconvex_opennbhsbasis Bb).2).2.
     apply => //=; last by exists y.

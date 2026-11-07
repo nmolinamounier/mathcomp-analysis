@@ -2,8 +2,9 @@
 From HB Require Import structures.
 From mathcomp Require Import boot order ssralg ssrnum interval
   interval_inference.
-From mathcomp Require Import boolp classical_sets ereal reals real_interval.
-From mathcomp Require Import topology ereal num_normedtype.
+From mathcomp Require Import boolp classical_sets sup_inf 
+  ereal reals real_interval.
+From mathcomp Require Import topology num_normedtype.
 
 (**md**************************************************************************)
 (* # Preliminaries for norm-related notions                                   *)
@@ -40,23 +41,25 @@ Local Open Scope classical_set_scope.
 Local Open Scope ring_scope.
 
 Section limf_esup_einf.
-Context {T : choiceType} {X : filteredType T} {R : realFieldType}.
+Context {T : choiceType} {X : filteredType T} {R : realType}.
 Implicit Types (f : X -> \bar R) (F : set_system X).
 Local Open Scope ereal_scope.
 
-Definition limf_esup f F := ereal_inf [set ereal_sup (f @` V) | V in F].
+Definition limf_esup f F := inf [set sup (f @` V) | V in F].
 
 Definition limf_einf f F := - limf_esup (\- f) F.
 
 Lemma limf_esupE f F :
-  limf_esup f F = ereal_inf [set ereal_sup (f @` V) | V in F].
+  limf_esup f F = inf [set sup (f @` V) | V in F].
 Proof. by []. Qed.
 
 Lemma limf_einfE f F :
-  limf_einf f F = ereal_sup [set ereal_inf (f @` V) | V in F].
+  limf_einf f F = sup [set inf (f @` V) | V in F].
 Proof.
-rewrite /limf_einf limf_esupE /ereal_inf oppeK -[in RHS]image_comp /=.
-congr (ereal_sup [set _ | _ in [set ereal_sup _ | _ in _]]).
+rewrite /limf_einf limf_esupE ereal_infEN.
+under [in RHS]eq_imagel do rewrite ereal_infEN.
+rewrite oppeK -[in RHS]image_comp /=.
+congr (sup [set _ | _ in [set sup _ | _ in _]]).
 by under eq_fun do rewrite -image_comp.
 Qed.
 
@@ -73,12 +76,14 @@ Context {T : choiceType} {X : filteredType T} {R : realType}.
 Implicit Types (f : X -> \bar R) (F : set_system X).
 Local Open Scope ereal_scope.
 
+Import Dedekind.TBOrder.
+
 Lemma limf_esup_ge0 f F : ~ F set0 ->
   (forall x, 0 <= f x) -> 0 <= limf_esup f F.
 Proof.
-move=> F0 f0; rewrite limf_esupE; apply: le_ereal_inf_tmp => /= x [A].
+move=> F0 f0; rewrite limf_esupE; apply: le_inf => /= x [A].
 have [-> /F0//|/set0P[y Ay FA] <-{x}] := eqVneq A set0.
-by apply: le_ereal_sup_tmp; exists (f y).
+by apply: le_sup; exists (f y).
 Qed.
 
 End limf_esup_einf_realType.

@@ -3,7 +3,7 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra.
 From mathcomp Require Import boolp classical_sets functions cardinality fsbigop.
 From mathcomp Require Import reals interval_inference ereal topology normedtype.
-From mathcomp Require Import sequences esum.
+From mathcomp Require Import sup_inf sequences esum.
 From mathcomp Require Import measurable_structure measure_function.
 From mathcomp Require Import measure_negligible.
 
@@ -83,7 +83,7 @@ Unset SsrOldRewriteGoalsOrder.  (* remove the line when requiring MathComp >= 2.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-Import Order.TTheory GRing.Theory Num.Theory.
+Import Order.TTheory GRing.Theory Num.Theory Dedekind.TBOrder.
 
 Local Open Scope classical_set_scope.
 Local Open Scope ring_scope.
@@ -355,14 +355,14 @@ Proof.
 move=> MA tA X.
 set A' := \bigcup_k A k; set B := fun n => \big[setU/set0]_(k < n) (A k).
 suff : forall n, \sum_(k < n) mu (X `&` A k) + mu (X `&` ~` A') <= mu X.
-  move=> XA; rewrite (_ : limn _ = ereal_sup
+  move=> XA; rewrite (_ : limn _ = sup
       ((fun n => \sum_(k < n) mu (X `&` A k)) @` setT)).
     under eq_fun do rewrite big_mkord.
     apply/cvg_lim => //; apply: ereal_nondecreasing_cvgn.
     apply: (lee_sum_nneg_ord (fun n => mu (X `&` A n)) xpredT) => n _.
     exact: outer_measure_ge0.
   move XAx : (mu (X `&` ~` A')) => [x| |].
-  - rewrite -leeBrDr //; apply: ge_ereal_sup => /= _ [n _] <-.
+  - rewrite -leeBrDr //; apply: ge_sup => /= _ [n _] <-.
     by rewrite EFinN leeBrDr // -XAx XA.
   - suff : mu X = +oo by move=> ->; rewrite leey.
     by apply/eqP; rewrite -leye_eq -XAx le_outer_measure.
@@ -497,19 +497,21 @@ Variable mu : set T -> \bar R.
 Hypothesis (measure0 : mu set0 = 0) (measure_ge0 : forall X, mu X >= 0).
 Hint Resolve measure_ge0 measure0 : core.
 
+Import Dedekind.TBOrder.
+
 Definition mu_ext (X : set T) : \bar R :=
-  ereal_inf [set \sum_(k <oo) mu (A k) | A in measurable_cover X].
+  inf [set \sum_(k <oo) mu (A k) | A in measurable_cover X].
 Local Notation "mu^*" := mu_ext.
 
 Lemma le_mu_ext : {homo mu^* : A B / A `<=` B >-> A <= B}.
 Proof.
-move=> A B AB; apply/ereal_inf_le_tmp => x [B' [mB' BB']].
+move=> A B AB; apply/infS => x [B' [mB' BB']].
 by move=> <-{x}; exists B' => //; split => //; apply: subset_trans AB BB'.
 Qed.
 
 Lemma mu_ext_ge0 A : 0 <= mu^* A.
 Proof.
-apply: le_ereal_inf_tmp => x [B [mB AB] <-{x}]; rewrite lime_ge //=.
+apply: le_inf => x [B [mB AB] <-{x}]; rewrite lime_ge //=.
   exact: is_cvg_nneseries.
 by near=> n; rewrite sume_ge0.
 Unshelve. all: by end_near. Qed.
@@ -517,7 +519,7 @@ Unshelve. all: by end_near. Qed.
 Lemma mu_ext0 : mu^* set0 = 0.
 Proof.
 apply/eqP; rewrite eq_le; apply/andP; split => //; last exact/mu_ext_ge0.
-rewrite /mu_ext; apply: ereal_inf_lbound; exists (fun=> set0); first by split.
+rewrite /mu_ext; apply: lb_ge_inf; exists (fun=> set0); first by split.
 by apply: lim_near_cst => //; near=> n => /=; rewrite big1.
 Unshelve. all: by end_near. Qed.
 
@@ -536,18 +538,18 @@ pose P n (B : (set T)^nat) := measurable_cover (A n) B /\
   \sum_(k <oo) mu (B k) <= mu^* (A n) + (e%:num / (2 ^ n.+1)%:R)%:E.
 have [G PG] : {G : ((set T)^nat)^nat & forall n, P n (G n)}.
   apply: (@choice _ _ P) => n; rewrite /P /mu_ext.
-  set S := (X in ereal_inf X); move infS : (ereal_inf S) => iS.
+  set S := (X in inf X); move infS : (inf S) => iS.
   case: iS infS => [r Sr|Soo|Soo].
   - have en1 : (0 < e%:num / (2 ^ n.+1)%:R)%R by [].
-    have /(lb_ereal_inf_adherent en1) : ereal_inf S \is a fin_num by rewrite Sr.
+    have /(fin_inf_adherent en1) : inf S \is a fin_num by rewrite Sr.
     move=> [x [B [mB AnB muBx] xS]].
     by exists B; split => //; rewrite muBx -Sr; exact/ltW.
   - by have := Aoo n; rewrite /mu^* Soo.
-  - suff : lbound S 0 by move/le_ereal_inf_tmp; rewrite Soo.
+  - suff : lbound S 0 by move/le_inf; rewrite Soo.
     by move=> /= _ [B [mB AnB] <-]; exact: nneseries_ge0.
 have muG_ge0 x : 0 <= (mu \o uncurry G) x by exact: measure_ge0.
 apply: (@le_trans _ _ (\esum_(i in setT) (mu \o uncurry G) i)).
-  rewrite /mu_ext; apply: ereal_inf_lbound => /=.
+  rewrite /mu_ext; apply: lb_ge_inf => /=.
   have /card_esym/ppcard_eqP[f] := card_nat2.
   exists (uncurry G \o f).
     split => [i|]; first exact/measurable_uncurry/(PG (f i).1).1.1.
@@ -607,7 +609,7 @@ Lemma Rmu_ext d (R : realType) (T : semiRingOfSetsType d)
   (measure mu)^* = mu^*.
 Proof.
 apply/funeqP => /= X; rewrite /mu_ext/=; apply/eqP; rewrite eq_le.
-rewrite !le_ereal_inf_tmp// => _ [F [Fm XS] <-]; rewrite ereal_inf_lbound//.
+rewrite !le_inf// => _ [F [Fm XS] <-]; rewrite lb_ge_inf//.
   exists F; first by split=> // i; exact: sub_gen_smallest.
   by rewrite (eq_eseriesr (fun _ _ => RmuE _ (Fm _))).
 pose K := [set: nat] `*`` fun i => decomp (F i).
@@ -637,12 +639,12 @@ Lemma measurable_mu_extE d (R : realType) (T : semiRingOfSetsType d)
 Proof.
 move=> mX; apply/eqP; rewrite eq_le; apply/andP; split.
   set f := fun n => if n is 0%N then X else set0.
-  apply: ereal_inf_lbound; exists f.
+  apply: lb_ge_inf; exists f.
     by split=> [[]//=|t Xt]; exists 0%N.
   apply/cvg_lim => //; rewrite -cvg_shiftS -[X in _ --> X]/(nbhs (mu X)).
   rewrite [X in X @ _](_ : _ = cst (mu X))//.
   by rewrite funeqE => n /=; rewrite big_nat_recl//= big1 ?adde0.
-apply/le_ereal_inf_tmp => x [A [mA XA] <-{x}].
+apply/le_inf => x [A [mA XA] <-{x}].
 have XUA : X = \bigcup_n (X `&` A n).
   rewrite predeqE => t; split => [Xt|[i _ []//]].
   by have [i _ Ait] := XA _ Xt; exists i.
@@ -675,7 +677,7 @@ apply: smallest_sub.
   split => //; [by move=> X mX; rewrite setTD; exact: measurableC |
                 by move=> u_ mu_; exact: bigcupT_measurable].
 move=> A mA; apply le_caratheodory_measurable => // X.
-apply: le_ereal_inf_tmp => _ [B [mB XB] <-].
+apply: le_inf => _ [B [mB XB] <-].
 rewrite -(eq_eseriesr (fun _ _ => SetRing.RmuE _ (mB _))) => //.
 have RmB i : measurable (B i : set rT) by exact: sub_gen_smallest.
 set BA := eseries (fun n => Rmu (B n `&` A)).

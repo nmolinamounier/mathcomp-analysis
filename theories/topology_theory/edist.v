@@ -4,7 +4,7 @@ From mathcomp Require Import boot order finmap ssralg ssrnum.
 From mathcomp Require Import interval interval_inference archimedean.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets functions.
+From mathcomp Require Import boolp classical_sets functions sup_inf.
 From mathcomp Require Import set_interval reals topology_structure
   pseudometric_structure num_topology product_topology metric_structure
   separation_axioms ereal.
@@ -24,7 +24,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Import Order.TTheory GRing.Theory Num.Theory.
+Import Order.TTheory GRing.Theory Num.Theory Dedekind.TBOrder.
 Import numFieldTopology.Exports.
 
 Local Open Scope classical_set_scope.
@@ -35,11 +35,11 @@ Context {R : realType} {X : pseudoMetricType R}.
 Implicit Types r : R.
 
 Definition edist (xy : X * X) : \bar R :=
-  ereal_inf (EFin @` [set r | 0 < r /\ ball xy.1 r xy.2]).
+  inf (EFin @` [set r | 0 < r /\ ball xy.1 r xy.2]).
 
 Lemma edist_ge0 (xy : X * X) : (0 <= edist xy)%E.
 Proof.
-by apply: le_ereal_inf_tmp => z [+ []] => _/posnumP[r] _ <-; rewrite lee_fin.
+by apply: le_inf => z [+ []] => _/posnumP[r] _ <-; rewrite lee_fin.
 Qed.
 Hint Resolve edist_ge0 : core.
 
@@ -49,22 +49,22 @@ Hint Resolve edist_neqNy : core.
 
 Lemma edist_lt_ball r (xy : X * X) : (edist xy < r%:E)%E -> ball xy.1 r xy.2.
 Proof.
-case/ereal_inf_lt => ? [+ []] => _/posnumP[eps] bxye <-; rewrite lte_fin.
+case/gt_inf_ex => ? [+ []] => _/posnumP[eps] bxye <-; rewrite lte_fin.
 by move/ltW/le_ball; exact.
 Qed.
 
 Lemma edist_fin r (xy : X * X) :
   0 < r -> ball xy.1 r xy.2 -> (edist xy <= r%:E)%E.
 Proof.
-move: r => _/posnumP[r] => ?; rewrite -(ereal_inf1 r%:num%:E) ereal_inf_le_tmp//.
-by move=> ? -> /=; exists r%:num; split.
+move: r => _/posnumP[r] => ?; rewrite lb_ge_inf//.
+by exists r%:num.
 Qed.
 
 Lemma edist_pinftyP (xy : X * X) :
   (edist xy = +oo)%E <-> (forall r, 0 < r -> ~ ball xy.1 r xy.2).
 Proof.
 split.
-  move/ereal_inf_pinfty => xrb r rpos rb; move: (ltry r); rewrite ltey => /eqP.
+  move/infy => xrb r rpos rb; move: (ltry r); rewrite ltey => /eqP.
   by apply; apply: xrb; exists r.
 rewrite /edist=> nrb; suff -> : [set r | 0 < r /\ ball xy.1 r xy.2] = set0.
   by rewrite image_set0 ereal_inf0.
@@ -117,20 +117,20 @@ have [|] := eqVneq (edist (x, z)) +oo%E.
   exact: (ball_triangle xy).
 rewrite -ltey -ge0_fin_numE// => /[dup] xzfin.
 move/edist_finP => [_/posnumP[del] /= xz].
-rewrite /edist /= ?ereal_inf_EFin.
-- by exists 0 => ? /= [/ltW].
+rewrite /edist /= ?inf_EFin; [split .. |].
 - by exists (r1%:num + r2%:num); split => //; apply: (ball_triangle xy).
 - by exists 0 => ? /= [/ltW].
 - by exists r1%:num; split.
 - by exists 0 => ? /= [/ltW].
 - by exists r2%:num; split.
+- by exists 0 => ? /= [/ltW].
 rewrite -EFinD lee_fin -inf_sumE //.
 - by split; [exists r1%:num; split| exists 0 => ? /= [/ltW]].
 - by split; [exists r2%:num; split| exists 0 => ? /= [/ltW]].
-apply: lb_le_inf.
+apply: Dedekind.Order.le_inf.
   by exists (r1%:num + r2%:num); exists r1%:num => //; exists r2%:num.
 move=> ? [+ []] => _/posnumP[p] xpy [+ []] => _/posnumP[q] yqz <-.
-apply: ge_inf; first by exists 0 => ? /= [/ltW].
+apply: Dedekind.Order.lb_ge_inf; first by exists 0 => ? /= [/ltW].
 by split => //; exact: (ball_triangle xpy).
 Qed.
 
@@ -184,7 +184,7 @@ have xxfin : edist (x, y) \is a fin_num.
 have dpose : fine (edist (x, y)) > 0 by rewrite -lte_fin fineK.
 pose eps := PosNum dpose.
 have : (edist (x, y) <= (eps%:num / 2)%:E)%E.
-  apply: ereal_inf_lbound; exists (eps%:num / 2) => //; split => //.
+  apply: lb_ge_inf; exists (eps%:num / 2) => //; split => //.
   exact: (bxy (eps%:num / 2)%:pos).
 apply: contra_leP => _.
 by rewrite /= EFinM fineK// lte_pdivrMr// lte_pmulr// lte1n.
@@ -208,10 +208,10 @@ Hint Extern 0 (is_true (edist _ != -oo%E)) => solve [apply: edist_neqNy] : core.
 Section edist_inf.
 Context {R : realType} {T : pseudoMetricType R} (A : set T).
 
-Definition edist_inf z := ereal_inf [set edist (z, a) | a in A].
+Definition edist_inf z := inf [set edist (z, a) | a in A].
 
 Lemma edist_inf_ge0 w : (0 <= edist_inf w)%E.
-Proof. by apply: le_ereal_inf_tmp => ? /= [? ? <-]. Qed.
+Proof. by apply: le_inf => ? /= [? ? <-]. Qed.
 Hint Resolve edist_inf_ge0 : core.
 
 Lemma edist_inf_neqNy w : (edist_inf w != -oo)%E.
@@ -227,9 +227,9 @@ have [fyn|] := boolP (edist_inf y \is a fin_num); first last.
 have [xyfin|] := boolP (edist (x, y) \is a fin_num); first last.
   by rewrite ge0_fin_numE// ?ltey // negbK => /eqP->; rewrite addye ?leey.
 apply/lee_addgt0Pr => _/posnumP[eps].
-have [//|? [a Aa <-] yaeps] := @lb_ereal_inf_adherent R _ eps%:num _ fyn.
+have [//|? [a Aa <-] yaeps] := @fin_inf_adherent R _ eps%:num _ fyn.
 apply: le_trans.
-  by apply: (@ereal_inf_lbound _ _ (edist (x, a))); exists a.
+  by apply: lb_ge_inf; exists a.
 apply: le_trans; first exact: (@edist_triangle _ _ _ y).
 by rewrite -addeA leeD2lE // ltW.
 Qed.
@@ -241,11 +241,11 @@ move=> z; have [A0|/= /set0P[a0 Aa0]] := eqVneq A set0.
   under eq_fun do rewrite image_set0 ereal_inf0.
   exact: cvg_cst.
 have [] := eqVneq (edist_inf z) +oo%E.
-  move=> /[dup] fzp /ereal_inf_pinfty => zAp U /= Ufz.
+  move=> /[dup] fzp /infy => zAp U /= Ufz.
   have : nbhs z (ball z 1) by exact: nbhsx_ballx.
   apply: filter_app; near_simpl; near=> w => bz1w.
   suff /= -> : (edist_inf w) = +oo%E by apply: nbhs_singleton; rewrite -fzp.
-  apply/ereal_inf_pinfty => r [a Aa] war; apply/zAp; exists a => //.
+  apply/infy => r [a Aa] war; apply/zAp; exists a => //.
   have /gee0P[|[r' r'pos war']] := edist_ge0 (w, a).
     by rewrite war => ->; apply: zAp; exists a.
   have := @edist_triangle _ _ z w a; rewrite war'; apply: contra_leP => _.
@@ -278,7 +278,7 @@ Unshelve. all: by end_near. Qed.
 Lemma edist_inf0 a : A a -> edist_inf a = 0%E.
 Proof.
 move=> Aa; apply: le_anti; apply/andP; split; last exact: edist_inf_ge0.
-by apply: ereal_inf_lbound; exists a => //; exact: edist_refl.
+by apply: lb_ge_inf; exists a => //; exact: edist_refl.
 Qed.
 
 End edist_inf.

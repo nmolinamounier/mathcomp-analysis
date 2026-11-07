@@ -4,7 +4,7 @@ From mathcomp Require Import boot order ssralg ssrnum interval
   interval_inference archimedean rat.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets functions.
+From mathcomp Require Import boolp classical_sets functions sup_inf.
 From mathcomp Require Import reals ereal topology numfun normedtype sequences
   measure realfun exp.
 From mathcomp Require Import lebesgue_stieltjes_measure.
@@ -1469,12 +1469,12 @@ Lemma measurable_fun_limn_esup D (f : (T -> \bar R)^nat) :
   measurable_fun D (fun x => limn_esup (f ^~ x)).
 Proof.
 move=> mf mD; rewrite (_ :  (fun _ => _) =
-    (fun x => ereal_inf [set esups (f^~ x) n | n in [set n | n >= 0]%N])); last first.
+    (fun x => inf [set esups (f^~ x) n | n in [set n | n >= 0]%N])); last first.
   by apply: measurable_fun_einfs => // k; exact: measurable_fun_esups.
 rewrite funeqE => t; rewrite limn_esup_lim; apply/cvg_lim => //.
-rewrite [X in _ --> X](_ : _ = ereal_inf (range (esups (f^~t)))); last first.
+rewrite [X in _ --> X](_ : _ = inf (range (esups (f^~t)))); last first.
   exact: cvg_esups_inf.
-by congr (ereal_inf [set _ | _ in _]); rewrite predeqE.
+by congr (inf [set _ | _ in _]); rewrite predeqE.
 Qed.
 
 Lemma emeasurable_fun_cvg D (f_ : (T -> \bar R)^nat) (f : T -> \bar R) :
@@ -1497,13 +1497,15 @@ Context {R : realType}.
 Implicit Types (A : set R).
 Local Open Scope ereal_scope.
 
+Import Dedekind.TBOrder.
+
 Let l := (@wlength R idfun).
 
 Lemma outer_measure_open_itv_cover A : (l^* A)%mu =
-  ereal_inf [set \sum_(k <oo) l (F k) | F in open_itv_cover A].
+  inf [set \sum_(k <oo) l (F k) | F in open_itv_cover A].
 Proof.
 apply/eqP; rewrite eq_le; apply/andP; split.
-  apply: ereal_inf_le_tmp => _ /= [F [Fitv AF <-]].
+  apply: infS => _ /= [F [Fitv AF <-]].
   exists (fun i => `](sval (cid (Fitv i))).1, (sval (cid (Fitv i))).2]%classic).
   + split=> [i|].
     * have [?|?] := ltP (sval (cid (Fitv i))).1 (sval (cid (Fitv i))).2.
@@ -1515,7 +1517,7 @@ apply/eqP; rewrite eq_le; apply/andP; split.
   + apply: eq_eseriesr => k _; rewrite /l wlength_itv/=.
     case: (Fitv k) => /= -[a b]/= Fkab.
     by case: cid => /= -[x1 x2] ->; rewrite wlength_itv.
-have [/lb_ereal_inf_adherent lA|] :=
+have [/fin_inf_adherent lA|] :=
     boolP ((l^* A)%mu \is a fin_num); last first.
   rewrite ge0_fin_numE ?outer_measure_ge0// -leNgt leye_eq => /eqP ->.
   exact: leey.
@@ -1546,7 +1548,7 @@ have AG : A `<=` \bigcup_k G k.
   by apply: (subset_trans AF) => [/= r [n _ /FG Gnr]]; exists n.
 apply: (@le_trans _ _ (\sum_(0 <= k <oo) (l (F k) + (e / 2 ^+ k.+2)%:E))).
   apply: (@le_trans _ _ (\sum_(0 <= k <oo) l (G k))).
-    by apply: ereal_inf_lbound => /=; exists G.
+    by apply: lb_ge_inf => /=; exists G.
   exact: lee_nneseries.
 rewrite nneseriesD//.
   by move=> i _; rewrite lee_fin// divr_ge0// ltW.

@@ -268,6 +268,8 @@ Qed.
 
 HB.instance Definition _ := Order.POrder_isTotal.Build _ R R_total.
 
+Notation up := Rdefinitions.up.
+
 Lemma Rarchimedean_axiom : Num.archimedean_axiom R.
 Proof.
 move=> x; exists (Z.abs_nat (up x) + 2)%N.
@@ -381,7 +383,7 @@ Arguments RleP {x y}.
 Arguments RltP {x y}.
 
 Local Open Scope ring_scope.
-From mathcomp Require Import boolp classical_sets.
+From mathcomp Require Import boolp classical_sets sup_inf.
 From mathcomp Require Import reals.
 
 Section ssreal_struct_contd.
@@ -396,47 +398,51 @@ Qed.
 Lemma boundE E : bound E = has_ubound E.
 Proof. by apply/eq_exists=> x; rewrite is_upper_boundE. Qed.
 
-Lemma Rcondcomplete E : has_sup E -> {m | isLub E m}.
+Lemma Rcondcomplete E : has_sup E -> {m | supremums E m}.
 Proof.
 move=> [E0 uE]; have := completeness E; rewrite boundE => /(_ uE E0)[x [E1 E2]].
 exists x; split; first by rewrite -is_upper_boundE; apply: E1.
 by move=> y; rewrite -is_upper_boundE => /E2/RleP.
 Qed.
 
-Lemma Rsupremums_neq0 E : has_sup E -> (supremums E !=set0)%classic.
-Proof. by move=> /Rcondcomplete[x [? ?]]; exists x. Qed.
+Let Rsup E :=
+  if pselect (has_sup E) is left sE 
+  then sval (Rcondcomplete sE)
+  else 0.
 
-Lemma Rsup_isLub x0 E : has_sup E -> isLub E (supremum x0 E).
+Let ub_le_Rsup E : has_ubound E -> ubound E (Rsup E).
 Proof.
-have [-> [/set0P]|E0 hsE] := eqVneq E set0; first by rewrite eqxx.
-have [s [Es sE]] := Rcondcomplete hsE.
-split => x Ex; first by apply/ge_supremum_Nmem=> //; exact: Rsupremums_neq0.
-rewrite /supremum (negbTE E0); case: xgetP => /=.
-  by move=> _ -> [_ EsE]; apply/EsE.
-by have [y Ey /(_ y)] := Rsupremums_neq0 hsE.
+case: (eqVneq E set0) => [-> _ ? //|/set0P E0 ubE].
+rewrite /Rsup; case: pselect => [?|/not_andP[] //].
+by case: Rcondcomplete => /= x [].
 Qed.
 
-(* :TODO: rewrite like this using (a fork of?) Coquelicot *)
-(* Lemma real_sup_adherent (E : pred R) : real_sup E \in closure E. *)
-Lemma real_sup_adherent x0 E (eps : R) : 0 < eps ->
-  has_sup E -> exists2 e, E e & (supremum x0 E - eps) < e.
+Let Rsup_lub E : 
+  has_ubound E -> lbound (ubound E) !=set0 -> lbound (ubound E) (Rsup E).
 Proof.
-move=> eps_gt0 supE; set m := _ - eps; apply: contrapT=> mNsmall.
-have : (ubound E) m.
-  apply/ubP => y Ey.
-  by have /negP := mNsmall (ex_intro2 _ _ y Ey _); rewrite -leNgt.
-have [_ /(_ m)] := Rsup_isLub x0 supE.
-move => m_big /m_big.
-by rewrite -subr_ge0 addrC addKr oppr_ge0 leNgt eps_gt0.
+move=> ubE lbub0 x ubx.
+rewrite /Rsup; case: pselect => [?|/not_andP[] //]; last first.
+  move: lbub0 => /[swap] /nonemptyPn ->.
+  by rewrite ub_set0 /= lb_setT => -[].
+by case: Rcondcomplete => /= y [_]; apply.
 Qed.
 
-Lemma Rsup_ub x0 E : has_sup E -> (ubound E) (supremum x0 E).
+HB.instance Definition _ := 
+  POrder_hasSup.Build _ R ub_le_Rsup Rsup_lub.
+
+Let Rsup_out E : ~ has_sup E -> sup E = 0.
+Proof. by rewrite /sup /= /Rsup => nsE; case: pselect. Qed.
+
+Let Rinf_out E : ~ has_inf E -> inf E = 0.
 Proof.
-by move=> supE x Ex; apply/ge_supremum_Nmem => //; exact: Rsupremums_neq0.
+rewrite /inf /= /Rsup => niE; case: pselect => // hsE.
+case/not_andP: niE hsE => [/nonemptyPn -> /[dup] + hsE|]; last first.
+  by move=> /forallNP /= nlb /[dup] -[[x /nlb]].
+by case=> _ [?]; rewrite {1}lb_set0 ub_setT.
 Qed.
 
-HB.instance Definition _ := ArchimedeanField_isReal.Build R
-  (@Rsup_ub (0 : R)) (real_sup_adherent 0).
+HB.instance Definition _ := 
+  DedekindPOrder_BaseAddUMagma_ZeroSupInf.Build R Rsup_out Rinf_out.
 
 Implicit Types (x y : R) (m n : nat).
 

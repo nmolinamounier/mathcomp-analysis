@@ -426,7 +426,7 @@ rewrite le_eqVlt => /orP[/eqP supXr|]; last first.
 suff : ~ X° (sup X) by rewrite supXr.
 case/nbhs_ballP => _/posnumP[e] supXeX.
 have [f XsupXf] : exists f : {posnum R}, X (sup X + f%:num).
-  exists (e%:num / 2)%:pos; apply supXeX; rewrite /ball /= opprD addNKr normrN.
+  exists (e%:num / 2)%:pos; apply: supXeX; rewrite /ball /= opprD addNKr normrN.
   by rewrite gtr0_norm // ltr_pdivrMr // ltr_pMr // ltr1n.
 have : sup X + f%:num <= sup X by exact: ub_le_sup.
 by apply/negP; rewrite -ltNge; rewrite ltrDl.
@@ -437,13 +437,13 @@ Lemma left_bounded_interior (R : realType) (X : set R) :
 Proof.
 move=> lX r Xr; rewrite /mkset ltNge; apply/negP.
 rewrite le_eqVlt => /orP[/eqP rinfX|]; last first.
-  by apply/negP; rewrite -leNgt ge_inf//; exact: interior_subset.
+  by apply/negP; rewrite -leNgt lb_ge_inf//; exact: interior_subset.
 suff : ~ X° (inf X) by rewrite -rinfX.
 case/nbhs_ballP => _/posnumP[e] supXeX.
 have [f XsupXf] : exists f : {posnum R}, X (inf X - f%:num).
   exists (e%:num / 2)%:pos; apply supXeX; rewrite /ball /= opprB addrC subrK.
   by rewrite gtr0_norm // ltr_pdivrMr // ltr_pMr // ltr1n.
-have : inf X <= inf X - f%:num by exact: ge_inf.
+have : inf X <= inf X - f%:num by exact: lb_ge_inf.
 by apply/negP; rewrite -ltNge; rewrite ltrBlDr ltrDl.
 Qed.
 

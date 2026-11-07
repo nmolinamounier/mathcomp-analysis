@@ -8,7 +8,7 @@ From mathcomp Require Import boot order algebra interval_inference.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp fsbigop classical_sets functions cardinality.
-From mathcomp Require Import reals.
+From mathcomp Require Import reals sup_inf.
 From mathcomp Require Import ereal esum numfun.
 From mathcomp Require Import xfinmap discrete realseq.
 
@@ -32,6 +32,8 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Unset SsrOldRewriteGoalsOrder.  (* remove this line when requiring MathComp >= 2.6 *)
 
+From HB Require Import structures.
+
 Import Order.TTheory GRing.Theory Num.Theory.
 
 Local Open Scope fset_scope.
@@ -42,6 +44,8 @@ Local Notation simpm := Monoid.simpm.
 
 Section Summable.
 Context {T : choiceType} {R : realType} (f : T -> R).
+
+Import Dedekind.TBOrder.
 
 Definition summable := exists (M : R), forall (J : {fset T}),
   \sum_(x : J) `|f (val x)| <= M.
@@ -54,10 +58,8 @@ move: (xchoose _)=> {h} M /asboolP h; exists M => //.
 by have := h fset0; rewrite big_pred0 // => -[x]; rewrite in_fset0.
 Qed.
 
-End Summable.
-
-Lemma esum_summableP {T : choiceType} {R : realType} (f : T -> R) :
-  summable f <-> esummable [set: T] (EFin \o f).
+Lemma esum_summableP :
+  summable <-> esummable [set: T] (EFin \o f).
 Proof.
 have fsbigsum (B : {fset T}) :
     (\sum_(x \in [set` B]) `|f x|%:E)%R = (\sum_(x : B) `|f (\val x)|)%:E.
@@ -66,7 +68,7 @@ have fsbigsum (B : {fset T}) :
 split.
   move=> [M fM].
   rewrite /esummable ge0_esum// (@le_lt_trans _ _ M%:E) ?ltey//.
-  apply/ereal_supP => _/= [A [/finite_fsetP[B AB] _] <-].
+  apply: ge_sup => _/= [A [/finite_fsetP[B AB] _] <-].
   by rewrite AB fsbigsum; exact: fM.
 rewrite /summable => sf.
 exists (fine (\esum_(x in [set: T]) `|(EFin \o f) x|))%E => J/=.
@@ -74,6 +76,7 @@ rewrite -lee_fin -fsbigsum fineK.
   by rewrite ge0_fin_numE// esum_ge0.
 by rewrite -esum_fset// !ge0_esum//; exact: PosEsum.subset_pos_esum.
 Qed.
+End Summable.
 
 Module PosSum.
 
@@ -131,9 +134,9 @@ case: (pselect (has_sup E)); last first.
   by apply/(lt_le_trans lt_MuK)/mono_u.
 move=> supE; exists (sup E)%:E => //; first exact: ltNyr.
 elim/nbh_finW=>e /= gt0_e.
-case: (sup_adherent gt0_e supE)=> x [K ->] lt_uK.
+case: (sup_adherent gt0_e supE.1)=> x [K ->] lt_uK.
 exists K=> n le_Kn; rewrite inE distrC ger0_norm ?subr_ge0.
-  by move/ubP: (sup_upper_bound supE); apply; exists n.
+  by move/ubP: (ub_le_sup supE.2); apply; exists n.
 rewrite ltrBlDr addrC -ltrBlDr.
 by rewrite (lt_le_trans lt_uK) //; apply/mono_u.
 Qed.
@@ -172,7 +175,7 @@ Proof.
 rewrite /PosSum.psum; case: ifPn => // /asboolPn h.
 rewrite sup_out //; set X := [set r | _]%classic => hs.
 apply: h; exists (sup X) => J.
-by move/ubP : (sup_upper_bound hs); apply; exists J.
+by move/ubP : (ub_le_sup hs.2); apply; exists J.
 Qed.
 
 Lemma psum_sup_seq S : PosSum.psum S =
@@ -230,9 +233,9 @@ Lemma le_psum (F1 F2 : T -> R) :
   (forall x, 0 <= F1 x <= F2 x) -> summable F2 -> PosSum.psum F1 <= PosSum.psum F2.
 Proof.
 move=> le_F smF2; have smF1: summable F1 by apply/(le_summable le_F).
-rewrite /PosSum.psum (asboolT smF1) (asboolT smF2); apply: sup_le; first last.
-+ exact/summable_sup.
-+ by exists 0, fset0; rewrite big_fset0.
+have [F10 ubF1] := summable_sup smF1.
+have [F20 ubF2] := summable_sup smF2.
+rewrite /PosSum.psum (asboolT smF1) (asboolT smF2); apply: sup_le => //.
 move=> x [J ->]; apply/downP; exists (\sum_(j : J) `|F2 (val j)|).
   by exists J.
 apply/ler_sum=> /= j _; case/andP: (le_F (val j)) => h1 h2.
@@ -266,7 +269,7 @@ Lemma gerfin_psum S (J : {fset T}) :
   summable S -> \sum_(j : J) `|S (val j)| <= PosSum.psum S.
 Proof.
 move=> smS; rewrite /PosSum.psum (asboolT smS).
-by move/ubP : (sup_upper_bound (summable_sup smS)); apply; exists J.
+by move/ubP : (ub_le_sup (summable_sup smS).2); apply; exists J.
 Qed.
 
 Lemma gerfinseq_psum S (r : seq T) :
@@ -297,13 +300,15 @@ Qed.
 
 End SumTh.
 
+Import Dedekind.TBOrder.
+
 Lemma esum_psum {R : realType} {T : choiceType} (f : T -> R) :
     (forall i, 0 <= f i) -> summable f ->
   \esum_(x in [set: T]) (f x)%:E = (PosSum.psum f)%:E.
 Proof.
 move=> f0 sumf; apply/eqP; rewrite eq_le; apply/andP; split.
 - rewrite ge0_esum; first by move=> t _; rewrite lee_fin.
-  rewrite ge_ereal_sup//= => x [A [finA _]].
+  rewrite ge_sup//= => x [A [finA _]].
   rewrite fsumEFin// => <-.
   rewrite lee_fin fsbig_finite//=.
   move/finite_fsetP : finA => [J ->].
@@ -312,20 +317,22 @@ move=> f0 sumf; apply/eqP; rewrite eq_le; apply/andP; split.
 - rewrite (eq_esum _ _ (fun x => `|f x|%:E)).
     by move => t _; rewrite ger0_norm.
   have [nonempty hasub] := summable_sup sumf.
-  rewrite psum_absE// -ereal_sup_EFin// ge_ereal_sup//= => x [r [J ->] <-].
+  rewrite psum_absE// -sup_EFin// ge_sup//= => x [r [J ->] <-].
   rewrite esum_ge//; exists [set` J]%classic => //.
   rewrite fsumEFin// lee_fin (big_fset_seq (Num.Def.normr \o f))//=.
   by rewrite -[in leLHS](set_fsetK J) -fsbig_finite.
 Qed.
+
+Import Dedekind.Order.
 
 (* -------------------------------------------------------------------- *)
 Lemma max_sup {R : realType} x (E : set R) :
   (E `&` ubound E)%classic x -> sup E = x.
 Proof.
 case=> /= xE xubE; have nzE: nonempty E by exists x.
-apply/eqP; rewrite eq_le ge_sup //=.
-have : has_sup E by split; exists x.
-by move/sup_upper_bound/ubP; apply.
+apply/eqP; rewrite eq_le Dedekind.Order.ge_sup //=.
+have : has_ubound E by exists x.
+by move/ub_le_sup; apply.
 Qed.
 
 (* -------------------------------------------------------------------- *)
@@ -368,8 +375,8 @@ Lemma ger_big_psum r : uniq r -> summable S ->
 Proof.
 move=> uq_r smS; rewrite /PosSum.psum (asboolT smS).
 set E := (X in sup X).
-have : has_sup E by exact/summable_sup.
-move/sup_upper_bound/ubP; apply.
+have : has_ubound E by apply summable_sup.
+move/ub_le_sup/ubP; apply.
 by exists [fset x in r]; rewrite (big_seq_fset (fun i => `|S i|)).
 Qed.
 
@@ -435,7 +442,7 @@ apply/eqP; case: (x =P _) => // /eqP /lt_total /orP[]; last first.
   by apply/ler_sum=> /= i _; apply/ler_norm.
 move=> lt_xS; pose e := PosSum.psum S - x.
   have ge0_e: 0 < e by rewrite subr_gt0.
-case: (sup_adherent ge0_e (summable_sup smS)) => y.
+case: (sup_adherent ge0_e (summable_sup smS).1) => y.
 case=> /= J ->; rewrite /e /PosSum.psum (asboolT smS) subKr => lt_xSJ.
 pose k := \max_(j : J) (val j); have lt_x_uSk: x < u k.+1.
   apply/(lt_le_trans lt_xSJ); rewrite /u big_ord_mkfset.

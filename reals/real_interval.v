@@ -3,7 +3,7 @@ From mathcomp Require Import boot order finmap ssralg ssrnum ssrint interval.
 From mathcomp Require Import archimedean.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets functions.
+From mathcomp Require Import boolp classical_sets sup_inf functions.
 From mathcomp Require Export set_interval.
 From mathcomp Require Import reals interval_inference constructive_ereal.
 
@@ -78,7 +78,7 @@ Qed.
 Lemma inf_itv a b x : (BSide b x < a)%O ->
   inf [set` Interval (BSide b x) a] = x.
 Proof.
-case: a => [b' ?|[]]//; rewrite /inf => xa.
+case: a => [b' ?|[]]//; rewrite infEN => xa.
   rewrite opp_itv_bnd_bnd sup_itv// ?opprK//.
   by move: xa; case: b; case: b'; rewrite !bnd_simp ?lerN2 ?ltrN2.
 by rewrite  ?opp_itv_bndy sup_itv// opprK.

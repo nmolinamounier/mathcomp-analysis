@@ -5,7 +5,7 @@ From mathcomp Require Import interval_inference finmap fingroup perm rat.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp classical_sets cardinality functions fsbigop.
-From mathcomp Require Import set_interval reals.
+From mathcomp Require Import set_interval reals sup_inf.
 From mathcomp Require Import topology ereal numfun normedtype derive sequences.
 From mathcomp Require Import esum measurable_structure measurable_function.
 From mathcomp Require Import measure_function measure_negligible.
@@ -648,6 +648,8 @@ Section hahn_decomposition_lemma.
 Context d (T : measurableType d) (R : realType).
 Variables (nu : {charge set T -> \bar R}) (D : set T).
 
+Import Dedekind.TBOrder.
+
 Let elt_prop (x : set T * \bar R) := [/\ measurable x.1,
   x.1 `<=` D, 0 <= x.2 & nu x.1 >= mine (x.2 * 2^-1%:E) 1].
 
@@ -668,10 +670,10 @@ Proof. by rewrite (le_trans _ (nuA_g_ _))// le_min lee01 andbT mule_ge0. Qed.
 
 Let subDD A := [set nu E | E in [set E | measurable E /\ E `<=` D `\` A] ].
 
-Let d_ A := ereal_sup (subDD A).
+Let d_ A := sup (subDD A).
 
 Let d_ge0 X : 0 <= d_ X.
-Proof. by apply: ereal_sup_ubound => /=; exists set0; rewrite ?charge0. Qed.
+Proof. by apply: ub_le_sup => /=; exists set0; rewrite ?charge0. Qed.
 
 Let elt_rel i j :=
   [/\ g_ j = d_ (U_ i),  A_ j `<=` D `\` U_ i & U_ j = U_ i `|` A_ j ].
@@ -682,7 +684,7 @@ Proof.
 pose m := mine (d_ A * 2^-1%R%:E) 1; apply/cid.
 have := d_ge0 A; rewrite le_eqVlt => /predU1P[<-|d_gt0].
   by exists set0; split => //; rewrite charge0 mul0e minEle lee01.
-have /ereal_sup_gt/cid2[_ [B/= [mB BDA <- mnuB]]] : m < d_ A.
+have /lt_sup_ex/cid2[_ [B/= [mB BDA <- mnuB]]] : m < d_ A.
   rewrite /m; have [->|dn1oo] := eqVneq (d_ A) +oo.
     by rewrite min_r ?ltey ?gt0_mulye ?leey.
   rewrite -(@fineK _ (d_ A)); first by rewrite gt0_fin_numE// ltey.
@@ -754,11 +756,11 @@ have EH n : [set nu E] `<=` H n.
   by apply: (subset_trans FDAoo); apply: setDS; exact: bigsetU_bigcup.
 have nudelta n : nu E <= g_ (v n).
   move: n => [|n].
-    rewrite v0/=; apply: ereal_sup_ubound => /=; exists E; split => //.
+    rewrite v0/=; apply: ub_le_sup => /=; exists E; split => //.
     by apply: (subset_trans EDAoo); exact: setDS.
   suff : nu E <= d_ (U_ (v n)) by have [<- _] := Pv n.
-  have /ereal_sup_le := EH n.+1; rewrite ereal_sup1 => /le_trans; apply.
-  apply/ereal_sup_le => x/= [A' [mA' A'D ?]].
+  have /supS := EH n.+1; rewrite sup1 => /le_trans; apply.
+  apply/supS => x/= [A' [mA' A'D ?]].
   exists A' => //; split => //.
   by apply: (subset_trans A'D); apply: setDS; rewrite Ubig.
 apply: (@closed_cvg _ _ _ _ _ (fun v => nu E <= v) _ _ _ g_cvg_0) => //.
@@ -775,6 +777,8 @@ Definition hahn_decomposition d (T : semiRingOfSetsType d) (R : numFieldType)
 Section hahn_decomposition_theorem.
 Context d (T : measurableType d) (R : realType).
 Variable nu : {charge set T -> \bar R}.
+
+Import Dedekind.TBOrder.
 
 Let elt_prop (x : set T * \bar R) := [/\ x.2 <= 0,
   nu.-negative_set x.1 & nu x.1 <= maxe (x.2 * 2^-1%:E) (- 1%E) ].
@@ -799,11 +803,11 @@ Proof. by move: x => [[[? ?] ?]] -[]. Qed.
 
 Let subC A := [set nu E | E in [set E | measurable E /\ E `<=` ~` A] ].
 
-Let s_ A := ereal_inf (subC A).
+Let s_ A := inf (subC A).
 
 Let s_le0 X : s_ X <= 0.
 Proof.
-by apply: ereal_inf_lbound => /=; exists set0; rewrite ?charge0//=; split.
+by apply: lb_ge_inf => /=; exists set0; rewrite ?charge0//=; split.
 Qed.
 
 Let elt_rel i j :=
@@ -816,7 +820,7 @@ pose m := maxe (s_ U * 2^-1%R%:E) (- 1%E); apply/cid.
 have := s_le0 U; rewrite le_eqVlt => /predU1P[->|s_lt0].
   exists set0; split => //; rewrite ?charge0 ?mul0e ?maxEle ?lee0N1//.
   exact: negative_set0.
-have /ereal_inf_lt/cid2[_ [B/= [mB BU] <-] nuBm] : s_ U < m.
+have /gt_inf_ex/cid2[_ [B/= [mB BU] <-] nuBm] : s_ U < m.
   rewrite /m; have [->|s0oo] := eqVneq (s_ U) -oo.
     by rewrite max_r ?ltNye// gt0_mulNye// leNye.
   rewrite -(@fineK _ (s_ U)); first by rewrite lt0_fin_numE// ltNye.
@@ -853,9 +857,9 @@ exists P, N; split; [|exact: neg_set_N|by rewrite /P setvU|by rewrite /P setICl]
 split=> // D mD DP; rewrite leNgt; apply/negP => nuD0.
 have znuD n : z_ (v n) <= nu D.
   move: n => [|n].
-    rewrite v0 /=; apply: ereal_inf_lbound; exists D; split => //.
+    rewrite v0 /=; apply: lb_ge_inf; exists D; split => //.
     by rewrite setC0.
-  have [-> _ _] := Pv n; apply: ereal_inf_lbound => /=; exists D; split => //.
+  have [-> _ _] := Pv n; apply: lb_ge_inf => /=; exists D; split => //.
   apply: (subset_trans DP); apply: subsetC; rewrite Ubig.
   exact: bigsetU_bigcup.
 have max_le0 n : maxe (z_ (v n) * 2^-1%:E) (- 1%E) <= 0.

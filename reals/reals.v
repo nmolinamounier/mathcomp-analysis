@@ -72,10 +72,13 @@ Lemma has_lbound0 : has_lbound (@set0 R). Proof. by exists 0. Qed.
 
 Lemma has_ubound0 : has_ubound (@set0 R). Proof. by exists 0. Qed.
 
-Lemma ubound0 : ubound (@set0 R) = setT.
-Proof. by rewrite predeqE => r; split => // _. Qed.
+Lemma ub_setT : ubound [set: R] = set0.
+Proof.
+rewrite -subset0 => r /(_ (r+1) Logic.I).
+by rewrite addrC -subr_le0 addrK ler10.
+Qed.
 
-Lemma lboundT : lbound [set: R] = set0.
+Lemma lb_setT : lbound [set: R] = set0.
 Proof.
 rewrite predeqE => r; split => // /(_ (r - 1) Logic.I).
 by rewrite addrC -subr_ge0 addrK ler0N1.
@@ -231,7 +234,6 @@ End RealDerivedOps.
 
 Section real_sup_inf.
 Context {R : realType}.
-Import Dedekind.Order.
 
 Lemma sup0 : sup set0 = 0 :> R.
 Proof. by apply: sup_out => -[[]]. Qed.
@@ -266,8 +268,6 @@ End real_sup_inf.
 
 Section sup_inf_sum.
 Context {R : realType}.
-
-Import Dedekind.Order.
 
 Lemma has_sup_sumE (A B : set R) :
   has_sup A -> has_sup B -> has_sup (A `+ B).
@@ -317,8 +317,6 @@ End sup_inf_sum.
 Section FloorTheory.
 Variable R : realType.
 Implicit Types (x y : R) (i : int).
-
-Import Dedekind.Order.
 
 Lemma isint_Rfloor x : Rfloor x \is a Rint.
 Proof. by rewrite inE; exists (Num.floor x). Qed.
@@ -428,8 +426,6 @@ End CeilTheory.
 Section Sup.
 Context {R : realType}.
 Implicit Types A B : set R.
-
-Import Dedekind.Order.
 
 Lemma lt_sup_imfset {T : Type} (F : T -> R) l :
   has_sup [set y | exists x, y = F x] ->
@@ -572,32 +568,6 @@ Qed.
 
 End Sup.
 
-Lemma int_lbound_has_minimum (B : set int) i : B !=set0 -> lbound B i ->
-  exists j, B j /\ forall k, B k -> j <= k.
-Proof.
-move=> [i0 Bi0] lbBi; have [n i0in] : exists n, i0 - i = n%:Z.
-  by exists `|i0 - i|%N; rewrite gez0_abs // subr_ge0; exact: lbBi.
-elim: n i lbBi i0in => [i lbBi /eqP|n ih i lbBi i0in1].
-  by rewrite subr_eq0 => /eqP i0i; exists i0; split =>// k Bk; rewrite i0i lbBi.
-have i0i1n : i0 - (i + 1) = n by rewrite opprD addrA i0in1 -addn1 PoszD addrK.
-have [?|/not_forallP] := pselect (lbound B (i + 1)); first exact: (ih (i + 1)).
-move=> /contrapT[x /not_implyP[Bx i1x]]; exists x; split => // k Bk.
-rewrite (le_trans _ (lbBi _ Bk)) //.
-by move/negP : i1x; rewrite -ltNge ltzD1.
-Qed.
-
-Lemma nat_has_minimum (A : set nat) : A !=set0 ->
-  exists j, A j /\ forall k, A k -> (j <= k)%N.
-Proof.
-move=> A0.
-pose B : set int := [set x%:~R | x in A].
-have B0 : B !=set0 by apply: image_nonempty.
-have: lbound B 0 by move=> _ [b0 Bb0 <-]; rewrite ler0z.
-move/(int_lbound_has_minimum B0) => [_ [[i Ai <-]]] Bi.
-exists i; split=> // k Bk.
-by have := Bi k%:~R; rewrite ler_int; apply; exists k.
-Qed.
-
 Section rat_in_itvoo.
 
 Let bound_div (R : archiRealFieldType) (x y : R) : nat :=
@@ -614,44 +584,28 @@ Qed.
 Lemma rat_in_itvoo (R : archiRealFieldType) (x y : R) :
   x < y -> exists q, ratr q \in `]x, y[.
 Proof.
-move=> xy; move: (xy); rewrite -subr_gt0.
-move=> /(archi_bound_divP 1); set n := bound_div _ _ => nyx.
-have [m1 m1nx] : exists m1, m1.+1%:~R > x *+ n.
-  have := archi_bound_divP (x *+ n) ltr01; set p := bound_div _ _ => nxp.
-  have [x0|x0] := ltP 0 x.
-    exists p.-1; rewrite prednK // lt0n; apply: contraPN nxp => /eqP ->.
-    by apply/negP; rewrite -leNgt mulrn_wge0 // ltW.
-  by exists 0%N; rewrite (le_lt_trans _ ltr01) // mulrn_wle0.
-have [m2 m2nx] : exists m2, m2.+1%:~R > - x *+ n.
-  have := archi_bound_divP (- x *+ n) ltr01; set p := bound_div _ _ => nxp.
-  have [x0|x0] := ltP 0 x.
-    by exists O; rewrite (le_lt_trans _ ltr01) // nmulrn_rle0// oppr_lt0.
-  exists p.-1; rewrite prednK // -(ltr_nat R) (le_lt_trans _ nxp) //.
-  by rewrite mulrn_wge0 // oppr_ge0.
-have : exists m, -(m2.+1 : int) <= m <= m1.+1 /\ m%:~R - 1 <= x *+ n < m%:~R.
-  have m2m1 : - (m2.+1 : int) < m1.+1.
-    by rewrite -(ltr_int R) (lt_trans _ m1nx)// rmorphN /= ltrNl // -mulNrn.
-  pose B := [set m : int | m%:~R > x *+ n].
-  have m1B : B m1.+1 by [].
-  have m2B : lbound B (- m2.+1%:~R).
-    move=> i; rewrite /B /= -(opprK (x *+ n)) -ltrNl -mulNrn => nxi.
-    rewrite -(mulN1r m2.+1%:~R) mulN1r -lerNl.
-    by have := lt_trans nxi m2nx; rewrite intz -mulrNz ltr_int => /ltW.
-  have [m [Bm infB]] := int_lbound_has_minimum (ex_intro _ _ m1B) m2B.
-  have mN1B : ~ B (m - 1).
-    by move=> /infB; apply/negP; rewrite -ltNge ltrBlDr ltzD1.
-  exists m; (split; [apply/andP; split|apply/andP; split]) => //.
-  - by move: m2B; rewrite /lbound /= => /(_ _ Bm); rewrite intz.
-  - exact: infB.
-  - by rewrite leNgt; apply/negP; rewrite /B /= intrD in mN1B.
-move=> [m [/andP[m2m mm1] /andP[mnx nxm]]].
-have [/andP[a b] c] : x *+ n < m%:~R <= 1 + x *+ n /\ 1 + x *+ n < y *+ n.
-  (split; [apply/andP; split|]) => //; first by rewrite -lerBlDl.
-  by move: nyx; rewrite mulrnDl -ltrBrDr mulNrn.
-have n_gt0 : n != 0%N by apply: contraTN nyx => /eqP ->; rewrite mulr0n ltr10.
-exists (m%:Q / n%:Q); rewrite in_itv /= fmorph_div/= ratr_nat ratr_int.
-rewrite ltr_pdivlMr ?ltr_pdivrMr ?ltr0n ?lt0n// !mulr_natr nxm/=.
-apply: (le_lt_trans b c).
+wlog : x y / 0 <= x => [hgt0|].
+  case: (ger0P x); first exact: hgt0.
+  case: (ler0P y) => [y0 _ xy|y0 x0 _]; last first.
+    by exists 0; rewrite in_itv/= rmorph0 x0 y0.
+  have := hgt0 (-y) (-x); rewrite oppr_ge0 ltrN2.
+  move=> /(_ y0 xy)[q hq].
+  by exists (-q); rewrite in_itv/= rmorphN/= ltrNr ltrNl !(itvP hq).
+move=> x0 /[dup] xy; rewrite -subr_gt0 => yx0.
+have [n invn_lt_yx] : exists n, n.+1%:R^-1 < y - x.
+  exists (Num.bound ((y - x)^-1)).-1; rewrite prednK.
+    by rewrite -(ltr_nat R); apply: lt_trans (ltr_bound _); rewrite invr_gt0.
+  by rewrite invf_plt ?posrE// ltr_bound.
+pose m := Num.floor (x *+ n.+1 + 1).
+have m_gt0 : 0 < m%:~R :> R.
+  by rewrite /m ltr0z floor_gt0 lerDr mulrn_wge0.
+exists (m%:Q / n.+1%:Q).
+rewrite in_itv/= rmorph_div ?unitf_gt0//= !ratr_int; apply/andP; split.
+- rewrite ltr_pdivlMr ?ltr0z // mulrzr /m floorDrz// floor1.
+  exact: floorD1_gt.
+- rewrite ltr_pdivrMr ?ltr0z // /m.
+  apply: le_lt_trans; first exact: floor_le.
+  by rewrite -ltrBrDl -mulr_natr -mulrBl -ltr_pdivrMr ?ltr0z // ?div1r.
 Qed.
 
 End rat_in_itvoo.

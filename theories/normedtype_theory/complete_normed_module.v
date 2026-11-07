@@ -2,7 +2,7 @@
 From HB Require Import structures.
 From mathcomp Require Import boot order ssralg ssrnum vector.
 From mathcomp Require Import interval_inference.
-From mathcomp Require Import boolp classical_sets reals.
+From mathcomp Require Import boolp classical_sets reals sup_inf.
 From mathcomp Require Import topology tvs pseudometric_normed_Zmodule.
 From mathcomp Require Import normed_module.
 

@@ -4,7 +4,7 @@ From mathcomp Require Import boot order finmap ssralg ssrnum ssrint interval.
 From mathcomp Require Import interval_inference archimedean.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import boolp classical_sets fsbigop cardinality.
+From mathcomp Require Import boolp classical_sets fsbigop cardinality sup_inf.
 From mathcomp Require Import reals ereal topology normedtype sequences esum
   measure realfun.
 

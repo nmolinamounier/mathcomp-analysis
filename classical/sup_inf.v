@@ -1,7 +1,7 @@
 From HB Require Import structures.
 From mathcomp Require Import boot order ssralg matrix finmap ssrnum.
 From mathcomp Require Import ssrint rat interval.
-From mathcomp Require Import boolp classical_sets.
+From mathcomp Require Import boolp classical_sets functions.
 
 Import Order.Def.
 
@@ -481,6 +481,14 @@ Proof. by apply: sup_eq => [_ -> //|?]; apply. Qed.
 Lemma inf1 (x : T) : inf [set x] = x.
 Proof. by apply: inf_eq => [_ -> //|?]; apply. Qed.
 
+Lemma sup_cst U (A : set U) (x : T) : 
+  A !=set0 -> sup (cst x @` A) = x.
+Proof. by rewrite set_cst => /set0P /negbTE ->; exact: sup1. Qed.
+
+Lemma inf_cst U (A : set U) (x : T) : 
+  A !=set0 -> inf (cst x @` A) = x.
+Proof. by rewrite set_cst => /set0P /negbTE ->; exact: inf1. Qed.
+
 Lemma sup_le_set (x : T) : sup [set y | y <= x] = x.
 Proof. by apply: sup_eq => // ?; apply=> /=. Qed.
 
@@ -605,8 +613,9 @@ End dedekindOrder.
 
 End Order.
 
-Module TOrder.
 Import Order.
+
+Module TOrder.
 
 Section dedekindTPOrder.
 Context {d} {T : dedekindTPOrderType d}.
@@ -625,13 +634,13 @@ Lemma inf0Etop : inf set0 = \top :> T.
 Proof.
 apply/le_anti; rewrite lex1 /=.
 by apply: inf_glb => //; exists \top.
-Qed.
+Qed. 
+
+Lemma supTEtop : sup [set: T] = \top.
+Proof. by rewrite (rwP eqP) -le1x; apply: ub_le_sup. Qed.
 
 Lemma ub_le_sup A : ubound A (sup A).
 Proof. exact: ub_le_sup. Qed.
-
-Lemma lb_ge_inf A : has_lbound A -> lbound A (inf A).
-Proof. exact: lb_ge_inf. Qed.
 
 Lemma sup_lub A : 
   lbound (ubound A) !=set0 -> lbound (ubound A) (sup A).
@@ -643,12 +652,6 @@ Proof. by move=> ?; apply: inf_glb => //; exists \top. Qed.
 
 Lemma le_sup A r : down A r -> r <= sup A.
 Proof. exact: le_sup. Qed.
-
-Lemma ge_inf A r : has_lbound A -> up A r -> inf A <= r.
-Proof. exact: ge_inf. Qed.
-
-Lemma ge_sup {A} r : A !=set0 -> ubound A r -> sup A <= r.
-Proof. exact: ge_sup. Qed.
 
 Lemma le_inf {A} r : lbound A r -> r <= inf A.
 Proof. 
@@ -668,16 +671,9 @@ Qed.
 Lemma gt_sup {A} x : sup A < x -> forall y, A y -> y < x.
 Proof. exact: gt_sup. Qed.
 
-Lemma lt_inf {A} x : has_lbound A -> x < inf A -> forall y, A y -> x < y.
-Proof. exact: lt_inf. Qed.
-
 Lemma sup_ub_strict {A} :
   ~ A (sup A) -> A `<=` [set r | r < sup A].
 Proof. exact: sup_ub_strict. Qed.
-
-Lemma inf_lb_strict {A} : has_lbound A ->
-  ~ A (inf A) -> A `<=` [set r | inf A < r].
-Proof. exact: inf_lb_strict. Qed.
 
 Lemma sup_le A B : A !=set0 -> A `<=` down B -> sup A <= sup B.
 Proof. by move=> ?; apply: sup_le. Qed.
@@ -701,67 +697,33 @@ Lemma sup_setU A B : B !=set0 ->
   (forall a b, A a -> B b -> a <= b) -> sup (A `|` B) = sup B.
 Proof. by move=> ?; apply: sup_setU. Qed.
 
-Lemma inf_setU A B : has_inf A ->
-  (forall a b, A a -> B b -> a <= b) -> inf (A `|` B) = inf A.
-Proof. exact: inf_setU. Qed.
-
 Lemma lt_sup A r : 
   (exists2 x, A x & r < x) -> r < sup A.
 Proof. exact: lt_sup. Qed.
-
-Lemma gt_inf A r : has_lbound A ->
-  (exists2 x, A x & x < r) -> inf A < r.
-Proof. exact: gt_inf. Qed.
-
-Lemma sup_eq A r :
-  ubound A r -> lbound (ubound A) r ->
-  sup A = r.
-Proof. exact: sup_eq. Qed.
-
-Lemma inf_eq A r :
-  lbound A r -> ubound (lbound A) r ->
-  inf A = r.
-Proof. exact: inf_eq. Qed.
 
 Lemma sup_eq_sup A B :
   A `<=` down B -> B `<=` down A ->
   sup A = sup B.
 Proof. exact: sup_eq_sup. Qed.
 
-Lemma inf_eq_inf A B :
-  has_lbound A ->
-  A `<=` up B -> B `<=` up A ->
-  inf A = inf B.
-Proof. exact: inf_eq_inf. Qed.
-
 Lemma sup_downE A : sup (down A) = sup A.
 Proof. exact: sup_downE. Qed.
-
-Lemma inf_upE A : has_lbound A -> inf (up A) = inf A.
-Proof. exact: inf_upE. Qed.
-
-Lemma sup1 (x : T) : sup [set x] = x.
-Proof. exact: sup1. Qed.
-
-Lemma inf1 (x : T) : inf [set x] = x.
-Proof. exact: inf1. Qed.
-
-Lemma sup_le_set (x : T) : sup [set y | y <= x] = x.
-Proof. exact: sup_le_set. Qed.
-
-Lemma inf_ge_set (x : T) : inf [set y | x <= y] = x.
-Proof. exact: inf_ge_set. Qed.
 
 Lemma sup_interchange X Y (A : set X) (B : set Y) (f : X -> Y -> T) :
   sup [set sup [set f x y | y in B] | x in A]
     = sup [set sup [set f x y | x in A] | y in B].
 Proof. exact: sup_interchange. Qed.
 
-Lemma inf_interchange X Y (A : set X) (B : set Y) (f : X -> Y -> T) :
-  has_lbound [set f x y | x in A & y in B] ->
-  inf [set inf [set f x y | y in B] | x in A]
-    = inf [set inf [set f x y | x in A] | y in B].
-Proof. exact: inf_interchange. Qed.
+Lemma top_sup A : A \top -> sup A = \top.
+Proof. by move=> AT; apply/eqP; rewrite -le1x; apply: ub_le_sup. Qed.
+
+Lemma inf_topP A : has_lbound A -> inf A = \top <-> A `<=` [set \top].
+Proof. 
+move=> lbA; split=> [/eqP|]; last first.
+  by case/subset_set1 => ->; [exact: inf0Etop|exact: inf1].
+rewrite -le1x => /(le_infP _ lbA) + x => /[apply] /=.
+by rewrite le1x => /eqP.
+Qed.
 
 End dedekindTPOrder.
 #[global] Hint Extern 0 (has_ubound _) => solve[apply: top_has_ubound] : core.
@@ -771,10 +733,6 @@ Context {d} {T : dedekindTOrderType d}.
 Implicit Types (A B : set T).
 
 Import Order.TTheory.
-
-Lemma lt_sup_ex A r : A !=set0 ->
-  r < sup A -> exists2 y, A y & r < y.
-Proof. exact: lt_sup_ex. Qed.
 
 Lemma gt_inf_ex A r : 
   inf A < r -> exists2 y, A y & y < r.
@@ -794,21 +752,6 @@ case: (eqVneq A set0) => [-> _|/set0P ? ?]; last by apply: gt_infP.
 by rewrite inf0Etop lt1x; split=> // - [].
 Qed.
 
-Lemma gt_sup_eq A r : 
-  ubound A r ->
-  (forall x, x < r -> exists2 y, A y & x < y) -> 
-  sup A = r.
-Proof. exact: gt_sup_eq. Qed.
-
-Lemma lt_inf_eq A r : 
-  lbound A r ->
-  (forall x, r < x -> exists2 y, A y & y < x) -> 
-  inf A = r.
-Proof. exact: lt_inf_eq. Qed.
-
-Lemma sup_total {A} r : A !=set0 -> down A r \/ sup A <= r.
-Proof. exact: sup_total. Qed.
-
 Lemma inf_total {A} r : up A r \/ r <= inf A.
 Proof.
 by case: (eqVneq A set0) => [->|/set0P]
@@ -820,7 +763,6 @@ End dedekindTOrder.
 End TOrder.
 
 Module BOrder.
-Import Order.
 
 Section dedekindBPOrder.
 Context {d} {T : dedekindBPOrderType d}.
@@ -841,8 +783,8 @@ apply/le_anti; rewrite le0x andbT.
 by apply: sup_lub => //; exists \bot.
 Qed.
 
-Lemma ub_le_sup A : has_ubound A -> ubound A (sup A).
-Proof. exact: ub_le_sup. Qed.
+Lemma infTEbot : inf [set: T] = \bot.
+Proof. by rewrite (rwP eqP) -lex0; apply: lb_ge_inf. Qed.
 
 Lemma lb_ge_inf A : lbound A (inf A).
 Proof. exact: lb_ge_inf. Qed.
@@ -855,9 +797,6 @@ Lemma inf_glb A :
   ubound (lbound A) !=set0 -> ubound (lbound A) (inf A).
 Proof. exact: inf_glb. Qed.
 
-Lemma le_sup A r : has_ubound A -> down A r -> r <= sup A.
-Proof. exact: le_sup. Qed.
-
 Lemma ge_inf A r : up A r -> inf A <= r.
 Proof. exact: ge_inf. Qed.
 
@@ -866,9 +805,6 @@ Proof.
 by case: (eqVneq A set0) => [-> _|/set0P]
   ; [ rewrite sup0Ebot | exact: ge_sup ].
 Qed.
-
-Lemma le_inf {A} r : A !=set0 -> lbound A r -> r <= inf A.
-Proof. exact: le_inf. Qed.
 
 Lemma ge_supP {A} x : has_ubound A -> sup A <= x <-> ubound A x.
 Proof.
@@ -879,15 +815,8 @@ Qed.
 Lemma le_infP {A} x : A !=set0 -> x <= inf A <-> lbound A x.
 Proof. by move=> ?; exact: le_infP. Qed.
 
-Lemma gt_sup {A} x : has_ubound A -> sup A < x -> forall y, A y -> y < x.
-Proof. exact: gt_sup. Qed.
-
 Lemma lt_inf {A} x : x < inf A -> forall y, A y -> x < y.
 Proof. exact: lt_inf. Qed.
-
-Lemma sup_ub_strict {A} : has_ubound A ->
-  ~ A (sup A) -> A `<=` [set r | r < sup A].
-Proof. exact: sup_ub_strict. Qed.
 
 Lemma inf_lb_strict {A} : 
   ~ A (inf A) -> A `<=` [set r | inf A < r].
@@ -911,71 +840,37 @@ Qed.
 Lemma infS {A B} : A !=set0 -> A `<=` B -> inf B <= inf A.
 Proof. by move=> ?; apply: infS. Qed.
 
-Lemma sup_setU A B : has_sup B ->
-  (forall a b, A a -> B b -> a <= b) -> sup (A `|` B) = sup B.
-Proof. exact: sup_setU. Qed.
-
 Lemma inf_setU A B : A !=set0 ->
   (forall a b, A a -> B b -> a <= b) -> inf (A `|` B) = inf A.
 Proof. by move=> ?; apply: inf_setU. Qed.
 
-Lemma lt_sup A r : has_ubound A ->
-  (exists2 x, A x & r < x) -> r < sup A.
-Proof. exact: lt_sup. Qed.
-
 Lemma gt_inf A r :
   (exists2 x, A x & x < r) -> inf A < r.
 Proof. exact: gt_inf. Qed.
-
-Lemma sup_eq A r :
-  ubound A r -> lbound (ubound A) r ->
-  sup A = r.
-Proof. exact: sup_eq. Qed.
-
-Lemma inf_eq A r :
-  lbound A r -> ubound (lbound A) r ->
-  inf A = r.
-Proof. exact: inf_eq. Qed.
-
-Lemma sup_eq_sup A B :
-  has_ubound A ->
-  A `<=` down B -> B `<=` down A ->
-  sup A = sup B.
-Proof. exact: sup_eq_sup. Qed.
 
 Lemma inf_eq_inf A B :
   A `<=` up B -> B `<=` up A ->
   inf A = inf B.
 Proof. exact: inf_eq_inf. Qed.
 
-Lemma sup_downE A : has_ubound A -> sup (down A) = sup A.
-Proof. exact: sup_downE. Qed.
-
 Lemma inf_upE A : inf (up A) = inf A.
 Proof. exact: inf_upE. Qed.
-
-Lemma sup1 (x : T) : sup [set x] = x.
-Proof. exact: sup1. Qed.
-
-Lemma inf1 (x : T) : inf [set x] = x.
-Proof. exact: inf1. Qed.
-
-Lemma sup_le_set (x : T) : sup [set y | y <= x] = x.
-Proof. exact: sup_le_set. Qed.
-
-Lemma inf_ge_set (x : T) : inf [set y | x <= y] = x.
-Proof. exact: inf_ge_set. Qed.
-
-Lemma sup_interchange X Y (A : set X) (B : set Y) (f : X -> Y -> T) :
-  has_ubound [set f x y | x in A & y in B] ->
-  sup [set sup [set f x y | y in B] | x in A]
-    = sup [set sup [set f x y | x in A] | y in B].
-Proof. exact: sup_interchange. Qed.
 
 Lemma inf_interchange X Y (A : set X) (B : set Y) (f : X -> Y -> T) :
   inf [set inf [set f x y | y in B] | x in A]
     = inf [set inf [set f x y | x in A] | y in B].
 Proof. exact: inf_interchange. Qed.
+
+Lemma bot_inf A : A \bot -> inf A = \bot.
+Proof. by move=> AT; apply/eqP; rewrite -lex0; apply: lb_ge_inf. Qed.
+
+Lemma sup_botP A : has_ubound A -> sup A = \bot <-> A `<=` [set \bot].
+Proof. 
+move=> ubA; split=> [/eqP|]; last first.
+  by case/subset_set1 => ->; [exact: sup0Ebot|exact: sup1].
+rewrite -lex0 => /(ge_supP _ ubA) + x => /[apply] /=.
+by rewrite lex0 => /eqP.
+Qed.
 
 End dedekindBPOrder.
 #[global] Hint Extern 0 (has_lbound _) => solve[apply: bot_has_lbound] : core.
@@ -993,10 +888,6 @@ by case: (eqVneq A set0) => [->|/set0P Ane];
   [ rewrite sup0Ebot ltx0 | exact: lt_sup_ex ].
 Qed.
 
-Lemma gt_inf_ex A r : A !=set0 ->
-  inf A < r -> exists2 y, A y & y < r.
-Proof. exact: gt_inf_ex. Qed.
-
 Lemma lt_supP A r : has_ubound A ->
   r < sup A <-> exists2 y, A y & r < y.
 Proof.
@@ -1008,208 +899,37 @@ Lemma gt_infP A r : A !=set0 ->
   inf A < r <-> exists2 y, A y & y < r.
 Proof. by move=> ?; exact: gt_infP. Qed.
 
-Lemma gt_sup_eq A r : 
-  ubound A r ->
-  (forall x, x < r -> exists2 y, A y & x < y) -> 
-  sup A = r.
-Proof. exact: gt_sup_eq. Qed.
-
-Lemma lt_inf_eq A r : 
-  lbound A r ->
-  (forall x, r < x -> exists2 y, A y & y < x) -> 
-  inf A = r.
-Proof. exact: lt_inf_eq. Qed.
-
 Lemma sup_total {A} r : down A r \/ sup A <= r.
 Proof.
 by case: (eqVneq A set0) => [->|/set0P]
   ; [ rewrite sup0Ebot; right | exact: sup_total ].
 Qed.
 
-Lemma inf_total {A} r : A !=set0 -> up A r \/ r <= inf A.
-Proof. exact: inf_total. Qed.
-
 End dedekindBOrder.
 
 End BOrder.
 
 Module TBOrder.
-Import TOrder.
-Import BOrder.
+Export TOrder.
+Export BOrder.
 
 Section dedekindTBPOrder.
 Context {d} {T : dedekindTBPOrderType d}.
 Implicit Types (A B : set T).
 
-Import Order.LTheory.
+Lemma supS : {homo @sup _ T : A B / A `<=` B >-> A <= B}.
+Proof. move=> ? ?; exact: supS. Qed.
 
-Lemma ub_le_sup A : ubound A (sup A).
-Proof. exact: ub_le_sup. Qed.
-
-Lemma lb_ge_inf A : lbound A (inf A).
-Proof. exact: lb_ge_inf. Qed.
-
-Lemma sup_lub A : lbound (ubound A) (sup A).
-Proof. exact: sup_lub. Qed.
-
-Lemma inf_glb A : ubound (lbound A) (inf A).
-Proof. exact: TOrder.inf_glb. Qed.
-
-Lemma le_sup A r : down A r -> r <= sup A.
-Proof. exact: le_sup. Qed.
-
-Lemma ge_inf A r : up A r -> inf A <= r.
-Proof. exact: ge_inf. Qed.
-
-Lemma ge_sup {A} r : ubound A r -> sup A <= r.
-Proof. exact: ge_sup. Qed.
-
-Lemma le_inf {A} r : lbound A r -> r <= inf A.
-Proof. exact: TOrder.le_inf. Qed.
-
-Lemma ge_supP {A} x : sup A <= x <-> ubound A x.
-Proof. exact: ge_supP. Qed.
-
-Lemma le_infP {A} x : x <= inf A <-> lbound A x.
-Proof. exact: TOrder.le_infP. Qed.
-
-Lemma gt_sup {A} x : sup A < x -> forall y, A y -> y < x.
-Proof. exact: gt_sup. Qed.
-
-Lemma lt_inf {A} x : x < inf A -> forall y, A y -> x < y.
-Proof. exact: lt_inf. Qed.
-
-Lemma sup_ub_strict {A} : 
-  ~ A (sup A) -> A `<=` [set r | r < sup A].
-Proof. exact: sup_ub_strict. Qed.
-
-Lemma inf_lb_strict {A} : 
-  ~ A (inf A) -> A `<=` [set r | inf A < r].
-Proof. exact: inf_lb_strict. Qed.
-
-Lemma sup_le A B : A `<=` down B -> sup A <= sup B.
-Proof. exact: sup_le. Qed.
-
-Lemma inf_le A B : A `<=` up B -> inf B <= inf A.
-Proof. exact: TOrder.inf_le. Qed.
-
-Lemma supS {A B} : A `<=` B -> sup A <= sup B.
-Proof. exact: supS. Qed.
-
-Lemma infS {A B} : A `<=` B -> inf B <= inf A.
-Proof. exact: TOrder.infS. Qed.
-
-Lemma sup_setU A B : B !=set0 ->
-  (forall a b, A a -> B b -> a <= b) -> sup (A `|` B) = sup B.
-Proof. by move=> ?; apply: sup_setU. Qed.
-
-Lemma inf_setU A B : A !=set0 ->
-  (forall a b, A a -> B b -> a <= b) -> inf (A `|` B) = inf A.
-Proof. by move=> ?; apply: inf_setU. Qed.
-
-Lemma lt_sup A r :
-  (exists2 x, A x & r < x) -> r < sup A.
-Proof. exact: lt_sup. Qed.
-
-Lemma gt_inf A r :
-  (exists2 x, A x & x < r) -> inf A < r.
-Proof. exact: gt_inf. Qed.
-
-Lemma sup_eq A r :
-  ubound A r -> lbound (ubound A) r ->
-  sup A = r.
-Proof. exact: sup_eq. Qed.
-
-Lemma inf_eq A r :
-  lbound A r -> ubound (lbound A) r ->
-  inf A = r.
-Proof. exact: inf_eq. Qed.
-
-Lemma sup_eq_sup A B :
-  A `<=` down B -> B `<=` down A ->
-  sup A = sup B.
-Proof. exact: sup_eq_sup. Qed.
-
-Lemma inf_eq_inf A B :
-  A `<=` up B -> B `<=` up A ->
-  inf A = inf B.
-Proof. exact: inf_eq_inf. Qed.
-
-Lemma sup_downE A : sup (down A) = sup A.
-Proof. exact: sup_downE. Qed.
-
-Lemma inf_upE A : inf (up A) = inf A.
-Proof. exact: inf_upE. Qed.
-
-Lemma sup1 (x : T) : sup [set x] = x.
-Proof. exact: sup1. Qed.
-
-Lemma inf1 (x : T) : inf [set x] = x.
-Proof. exact: inf1. Qed.
-
-Lemma sup_le_set (x : T) : sup [set y | y <= x] = x.
-Proof. exact: sup_le_set. Qed.
-
-Lemma inf_ge_set (x : T) : inf [set y | x <= y] = x.
-Proof. exact: inf_ge_set. Qed.
-
-Lemma sup_interchange X Y (A : set X) (B : set Y) (f : X -> Y -> T) :
-  sup [set sup [set f x y | y in B] | x in A]
-    = sup [set sup [set f x y | x in A] | y in B].
-Proof. exact: sup_interchange. Qed.
-
-Lemma inf_interchange X Y (A : set X) (B : set Y) (f : X -> Y -> T) :
-  inf [set inf [set f x y | y in B] | x in A]
-    = inf [set inf [set f x y | x in A] | y in B].
-Proof. exact: inf_interchange. Qed.
+Lemma infS : {homo @inf _ T : A B / A `<=` B >-> B <= A}.
+Proof. move=> ? ?; exact: TOrder.infS. Qed.
 
 End dedekindTBPOrder.
-
-Section dedekindTBOrder.
-Context {d} {T : dedekindTBOrderType d}.
-Implicit Types (A B : set T).
-
-Import Order.TTheory.
-
-Lemma lt_sup_ex A r :
-  r < sup A -> exists2 y, A y & r < y.
-Proof. exact: lt_sup_ex. Qed.
-
-Lemma gt_inf_ex A r : 
-  inf A < r -> exists2 y, A y & y < r.
-Proof. exact: TOrder.gt_inf_ex. Qed.
-
-Lemma lt_supP A r : 
-  r < sup A <-> exists2 y, A y & r < y.
-Proof. exact: lt_supP. Qed.
-
-Lemma gt_infP A r : 
-  inf A < r <-> exists2 y, A y & y < r.
-Proof. exact: TOrder.gt_infP. Qed.
-
-Lemma gt_sup_eq A r : 
-  ubound A r ->
-  (forall x, x < r -> exists2 y, A y & x < y) -> 
-  sup A = r.
-Proof. exact: gt_sup_eq. Qed.
-
-Lemma lt_inf_eq A r : 
-  lbound A r ->
-  (forall x, r < x -> exists2 y, A y & y < x) -> 
-  inf A = r.
-Proof. exact: lt_inf_eq. Qed.
-
-Lemma sup_total {A} r : down A r \/ sup A <= r.
-Proof. exact: sup_total. Qed.
-
-Lemma inf_total {A} r : up A r \/ r <= inf A.
-Proof. exact: TOrder.inf_total. Qed.
-
-End dedekindTBOrder.
 
 End TBOrder.
 
 End Dedekind.
+
+Export Dedekind.Order.
 
 HB.mixin Record POrder_hasSup d T & Order.POrder d T := {
   sup : set T -> T ;
@@ -1315,44 +1035,85 @@ Qed.
 
 Lemma nat_sup_max (A : set nat) : has_sup A -> A (sup A).
 Proof.
-move=> [[x /mem_set Ax] [M ubM]].
-have ex_memA : exists n, mem A n by exists x.
-have ub_memA i : mem A i -> (i <= M)%N by move=> /set_mem; exact: ubM.
-pose n := ex_maxn ex_memA ub_memA.
-have : A n by rewrite /n; case: ex_maxnP => ? /set_mem.
-congr A; rewrite /n; case: ex_maxnP => i /set_mem Ai /= i_max.
-apply/esym; apply: sup_eq => [+ /mem_set|]; first exact: i_max.
-by move=> ?; apply.
+move=> [[x Ax] /[dup] ubA /ub_le_sup /(_ x Ax)].
+case: (posnP (sup A)) Ax => [-> /[swap]|sA0 _ _ {x}].
+  by rewrite leEnat leqn0 => /eqP ->.
+have : ((sup A).-1 < sup A)%N by rewrite ltn_predL.
+move=> /(@lt_sup_ex _ nat)[x Ax].
+rewrite ltEnat /= prednK // => sAx.
+move: (Ax); congr A; rewrite (rwP eqP) eqn_leq sAx andbT.
+by apply: (@ub_le_sup _ nat).
 Qed.
 
 End nat_dedekind.
 
 Section int_dedekind.
 Implicit Types (A : set int).
-Import intZmod intOrdered Order.TTheory Num.Def Num.Theory.
+Import intZmod intOrdered Order.TTheory Num.Def Num.Theory GRing.Theory.
+Import Dedekind.
 
 Local Open Scope int_scope.
 Local Open Scope ring_scope.
 
-Let inf_int A : int :=
-  min (- (sup [set absz i | i in A `&` [set` Num.npos]])%:R)
-    (inf [set absz i | i in A `&` [set` Num.nneg]] :> int).
+Let negset A := Negz @^-1` A.
+Let posset A := Posz @^-1` A.
+
 Let sup_int A : int :=
-  max (- (inf [set absz i | i in A `&` [set` Num.npos]])%:R)
-    (sup [set absz i | i in A `&` [set` Num.nneg]] :> int).
+  if posset A == set0 then Negz (inf (negset A)) else Posz (sup (posset A)).
 
 Let ub_le_sup_subproof A : has_ubound A -> ubound A (sup_int A).
 Proof.
-move=> [/= M ubM] i Ai.
-rewrite /sup_int le_max; apply/orP.
-case: (EM (A `&` [set` Num.npos] !=set0)) => [[x [/= Ax xnp]]|].
-- left; rewrite lerNr.
+rewrite /sup_int => -[/= M ubM] i Ai.
+case: ifPn => [/eqP|].
+  rewrite -subset0 /posset => Npos.
+  case: (intP i) Ai => [_|n _|n _]; [ by move/Npos .. |].
+  rewrite /oppz /Order.le/= => ANn.
+  by apply: (@BOrder.ge_inf _ nat); exists n.
+move=> /set0P[n]; rewrite {1}/posset /= => An.
+case: (intP i) Ai => // m _ Asm.
+rewrite lez_nat; apply: (@ub_le_sup _ nat) => //.
+case: (intP M) ubM => [_ /(_ _ Asm) //|k _ ubk|? _ /(_ _ Asm) //].
+by exists k.+1 => x Ax; have := ubk x Ax.
+Qed.
 
- 
+Let sup_lub_subproof A : 
+  has_ubound A -> lbound (ubound A) !=set0 -> 
+  lbound (ubound A) (sup_int A).
+Proof.
+rewrite /sup_int => - [/= M ubM] [x lbubx] i ubi.
+have Ane : A !=set0.
+  move: lbubx; apply: contraPP => /nonemptyPn -> /(_ (x-1) ltac:(done)).
+  by apply/negP; rewrite -ltNge gtrBl.
+case: ifPn => [/eqP|].
+  rewrite -subset0 /posset => Npos.
+  case: (intP i) ubi => // n _ ubNn.
+  rewrite /oppz /Order.le /=.
+  apply: (@le_inf _ nat); last by move=> m /ubNn.
+  by case: Ane => -[m /Npos //|m]; exact: ex_intro.
+move=> /set0P[n]; rewrite {1}/posset /= => An.
+case: i ubi => [k ubk|k /(_ _ An) //].
+by rewrite lez_nat; apply: (@BOrder.ge_sup _ nat) => l /ubk.
+Qed.
 
+HB.instance Definition _ := 
+  POrder_hasSup.Build _ int ub_le_sup_subproof sup_lub_subproof.
 
+Lemma int_sup_max A : has_sup A -> A (sup A).
+Proof.
+move=> [Ane ubA].
+have : sup A - 1 < sup A by rewrite gtrBl.
+case/lt_sup_ex => //= y.
+rewrite -lezD1 subrK => /[dup] + /(ub_le_sup ubA) iAy yiA.
+by congr A; apply/le_anti/andP.
+Qed.
 
+Lemma int_inf_min A : has_inf A -> A (inf A).
+Proof.
+move=> [Ane lbA].
+have : inf A < inf A + 1 by rewrite ltrDl.
+case/gt_inf_ex => //= y.
+rewrite ltzD1 => /[dup] + /(lb_ge_inf lbA) iAy yiA.
+by congr A; apply/le_anti/andP.
+Qed.
 
-
-
-HB.howto nat dedekindBOrderType. 
+End int_dedekind.
