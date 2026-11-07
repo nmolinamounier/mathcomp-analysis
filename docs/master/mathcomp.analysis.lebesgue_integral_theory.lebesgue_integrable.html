@@ -5,7 +5,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title>Module mathcomp.analysis.lebesgue_integral_theory.lebesgue_integrable</title>
-<meta name="description" content="Documentation of Coq module Mathcomp Analysis 00a80bd 2026.11.06-23:27" />
+<meta name="description" content="Documentation of Coq module Mathcomp Analysis 00a80bd 2026.11.07-22:12" />
 <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/markdown-it-deflist/dist/markdown-it-deflist.min.js"></script>
@@ -288,7 +288,24 @@ Detailed contents:
 <span class="vernacular">Local</span><span class="vernacular"> Open</span><span class="vernacular"> Scope</span><span class="id"> classical_set_scope</span>.<br/>
 <span class="vernacular">Local</span><span class="vernacular"> Open</span><span class="vernacular"> Scope</span><span class="id"> ring_scope</span>.<br/>
 <br/>
-<span id="integrable_unlock_subterm" class="id"><span id="integrable" class="id"><span id="integrable.unlock" class="id"><span id="integrable.body" class="id"><span id="integrable" class="id"><span id="integrable_Locked.unlock" class="id"><span id="integrable_Locked.body" class="id"><span id="integrable_Locked" class="id"><div name="integrable_unlock_subterm" class=" tooltip">HB<span class='tooltip-area'><hr/><a href='https://github.com/math-comp/analysis/tree/00a80bdd280330eb64f7eaf6a4ead748c323b46a/theories/lebesgue_integral_theory/lebesgue_integrable.v#L45' target='_blank'>Source code</a></span></div></span></span></span></span></span></span></span></span>.<span id="integrable_unlock_subterm" class="id"><span id="integrable" class="id"><span id="integrable.unlock" class="id"><span id="integrable.body" class="id"><span id="integrable" class="id"><span id="integrable_Locked.unlock" class="id"><span id="integrable_Locked.body" class="id"><span id="integrable_Locked" class="id"><div name="integrable_unlock_subterm" class=" tooltip">lock<span class='tooltip-area'><hr/><a href='https://github.com/math-comp/analysis/tree/00a80bdd280330eb64f7eaf6a4ead748c323b46a/theories/lebesgue_integral_theory/lebesgue_integrable.v#L45' target='_blank'>Source code</a></span></div></span></span></span></span></span></span></span></span><span id="integrable_unlock_subterm" class="id"><span id="integrable" class="id"><span id="integrable.unlock" class="id"><span id="integrable.body" class="id"><span id="integrable" class="id"><span id="integrable_Locked.unlock" class="id"><span id="integrable_Locked.body" class="id"><span id="integrable_Locked" class="id"><div name="integrable_unlock_subterm" class=" tooltip"> Definition<span class='tooltip-area'><p>integrable_unlock_subterm :
+<span id="integrable_unlock_subterm" class="id"><span id="integrable" class="id"><span id="integrable.unlock" class="id"><span id="integrable.body" class="id"><span id="integrable" class="id"><span id="integrable_Locked.unlock" class="id"><span id="integrable_Locked.body" class="id"><span id="integrable_Locked" class="id"><div name="integrable_unlock_subterm" class=" tooltip">HB<span class='tooltip-area'><hr/><a href='https://github.com/math-comp/analysis/tree/00a80bdd280330eb64f7eaf6a4ead748c323b46a/theories/lebesgue_integral_theory/lebesgue_integrable.v#L45' target='_blank'>Source code</a></span></div></span></span></span></span></span></span></span></span>.<span id="integrable_unlock_subterm" class="id"><span id="integrable" class="id"><span id="integrable.unlock" class="id"><span id="integrable.body" class="id"><span id="integrable" class="id"><span id="integrable_Locked.unlock" class="id"><span id="integrable_Locked.body" class="id"><span id="integrable_Locked" class="id"><div name="integrable_unlock_subterm" class=" tooltip">lock<span class='tooltip-area'><p>integrable_unlock_subterm :
+unlockable
+  (fun (d : measure_display) (T : measurableType d) 
+     (R : realType) (mu : set T -> \bar R) (D : set T)
+     (f : T ->
+          constructive_ereal_extended__canonical__measurable_structure_SigmaRing) =>
+   `[< measurable_fun (T:=T)
+         (U:=constructive_ereal_extended__canonical__measurable_structure_SigmaRing)
+         D f /\
+       (\int[mu]_(x in D) `|f x| < +oo)%E >])
+
+integrable_unlock_subterm is not universe polymorphic
+integrable_unlock_subterm is transparent
+Expands to: Constant
+            mathcomp.analysis.lebesgue_integral_theory.lebesgue_integrable.integrable_unlock_subterm
+Declared in
+library mathcomp.analysis.lebesgue_integral_theory.lebesgue_integrable, line 45, characters 0-172
+</p><hr/><a href='https://github.com/math-comp/analysis/tree/00a80bdd280330eb64f7eaf6a4ead748c323b46a/theories/lebesgue_integral_theory/lebesgue_integrable.v#L45' target='_blank'>Source code</a></span></div></span></span></span></span></span></span></span></span><span id="integrable_unlock_subterm" class="id"><span id="integrable" class="id"><span id="integrable.unlock" class="id"><span id="integrable.body" class="id"><span id="integrable" class="id"><span id="integrable_Locked.unlock" class="id"><span id="integrable_Locked.body" class="id"><span id="integrable_Locked" class="id"><div name="integrable_unlock_subterm" class=" tooltip"> Definition<span class='tooltip-area'><p>integrable_unlock_subterm :
 unlockable
   (fun (d : measure_display) (T : measurableType d) 
      (R : realType) (mu : set T -> \bar R) (D : set T)
