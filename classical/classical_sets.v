@@ -1122,11 +1122,29 @@ rewrite predeqE => -[x y]; split; first by move=> [/= Ax [n Pn Fny]]; exists n.
 by move=> [n Pn [/= Ax Fny]]; split => //; exists n.
 Qed.
 
+Lemma setX_bigcapr T1 T2 I (F : I -> set T2) (P : set I) (A : set T1) :
+  P !=set0 ->
+  A `*` \bigcap_(i in P) F i = \bigcap_(i in P) (A `*` F i).
+Proof.
+move=> [i0 Pi0]; rewrite predeqE => -[x y]; split. 
+  by move=> /= [Ax +] i Pi => /(_ i Pi).
+by move=> /[dup] hxy /(_ i0 Pi0)[Ax _]; split=> //= i Pi; case: (hxy i Pi).
+Qed.
+
 Lemma setX_bigcupl T1 T2 I (F : I -> set T2) (P : set I) (A : set T1) :
   \bigcup_(i in P) F i `*` A = \bigcup_(i in P) (F i `*` A).
 Proof.
 rewrite predeqE => -[x y]; split; first by move=> [[n Pn Fnx] Ax]; exists n.
 by move=> [n Pn [/= Ax Fny]]; split => //; exists n.
+Qed.
+
+Lemma setX_bigcapl T1 T2 I (F : I -> set T2) (P : set I) (A : set T1) :
+  P !=set0 ->
+  \bigcap_(i in P) F i `*` A = \bigcap_(i in P) (F i `*` A).
+Proof.
+move=> [i0 Pi0]; rewrite predeqE => -[x y]; split.
+  by move=> /= [+ Ax] i Pi => /(_ i Pi).
+by move=> /[dup] hxy /(_ i0 Pi0)[_ Ay]; split=> //= i Pi; case: (hxy i Pi).
 Qed.
 
 Lemma bigcupX1l T1 T2 (A1 : set T1) (A2 : T1 -> set T2) :
@@ -2068,6 +2086,14 @@ Lemma setU_bigcapl F P A :
   \bigcap_(i in P) F i `|` A = \bigcap_(i in P) (F i `|` A).
 Proof. by rewrite setUC setU_bigcapr//; under eq_bigcapr do rewrite setUC. Qed.
 
+Lemma setI_bigcup P Q F G : \bigcup_(i in P) F i `&` \bigcup_(j in Q) G j =
+  \bigcup_(i in P) \bigcup_(j in Q) (F i `&` G j).
+Proof. by rewrite setI_bigcupl; under eq_bigcupr do rewrite setI_bigcupr. Qed.
+
+Lemma setU_bigcap P Q F G : \bigcap_(i in P) F i `|` \bigcap_(i in Q) G i =
+  \bigcap_(i in P) \bigcap_(j in Q) (F i `|` G j).
+Proof. by rewrite setU_bigcapl; under eq_bigcapr do rewrite setU_bigcapr. Qed.
+
 Lemma bigcup_mkcond P F :
   \bigcup_(i in P) F i = \bigcup_i if i \in P then F i else set0.
 Proof.
@@ -2178,9 +2204,22 @@ apply/predeqP => x; split=> [|[i Pi [j Pj Fijx]]]; last by exists (i, j).
 by move=> [[/= i j] [Pi Qj] Fijx]; exists i => //; exists j.
 Qed.
 
+Lemma bigcap_setX_dep {J : Type} (F : I -> J -> set T)
+    (P : set I) (Q : I -> set J) :
+  \bigcap_(k in P `*`` Q) F k.1 k.2 = \bigcap_(i in P) \bigcap_(j in Q i) F i j.
+Proof.
+apply/predeqP => x; split=> [+ i Pi j Qij|+ [/= i j] [Pi Qij]].
+- by move/(_ (i,j)); apply.
+- by move/(_ i _ j); apply.
+Qed.
+
 Lemma bigcup_setX {J : Type} (F : I -> J -> set T) (P : set I) (Q : set J) :
   \bigcup_(k in P `*` Q) F k.1 k.2 = \bigcup_(i in P) \bigcup_(j in Q) F i j.
 Proof. exact: bigcup_setX_dep. Qed.
+
+Lemma bigcap_setX {J : Type} (F : I -> J -> set T) (P : set I) (Q : set J) :
+  \bigcap_(k in P `*` Q) F k.1 k.2 = \bigcap_(i in P) \bigcap_(j in Q) F i j.
+Proof. exact: bigcap_setX_dep. Qed.
 
 Lemma bigcup_bigcup T' (F : I -> set T) (P : set I) (G : T -> set T') :
   \bigcup_(i in \bigcup_(n in P) F n) G i =
@@ -2188,6 +2227,14 @@ Lemma bigcup_bigcup T' (F : I -> set T) (P : set I) (G : T -> set T') :
 Proof.
 apply/seteqP; split; first by move=> x [n [m ? ?] h]; exists m => //; exists n.
 by move=> x [n ? [m ?]] h; exists m => //; exists n.
+Qed.
+
+Lemma bigcap_bigcup T' (F : I -> set T) (P : set I) (G : T -> set T') :
+  \bigcap_(i in \bigcup_(n in P) F n) G i =
+  \bigcap_(n in P) \bigcap_(i in F n) G i.
+Proof.
+apply/seteqP; split; first by move=> x + n Pn i Fni; apply; exists n.
+by move=> x + i [n Pn Fni] => /(_ n); apply.
 Qed.
 
 Lemma bigcupID (Q : set I) (F : I -> set T) (P : set I) :
