@@ -1226,6 +1226,62 @@ End ClopenSets.
 #[deprecated(since="mathcomp-analysis 1.16.0", note="renamed to `preimage_clopen`")]
 Notation clopen_comp := preimage_clopen (only parsing).
 
+Section Gdelta_Fsigma.
+Context {T : topologicalType}.
+Implicit Type S : set T.
+
+Definition Gdelta S :=
+  exists2 F : (set T)^nat, (forall i, open (F i)) & S = \bigcap_i (F i).
+
+Lemma GdeltaP S :
+  Gdelta S <-> 
+  exists (I : set (set T)), [/\ 
+    countable I, 
+    forall A, I A -> open A &
+    S = \bigcap_(A in I) A
+  ].
+Proof.
+split=> [[F oF ->]|[I [+ oI ->]]].
+  exists (range F); split=> //.
+  - exact: card_image_le.
+  - move=> _ [i _ <-]; exact: oF.
+  - by rewrite bigcap_image.
+case/pfcard_geP => [->|/surjfunPex[f If]].
+  rewrite bigcap_set0; exists (fun=> setT) => [_|]; first exact: openT.
+  by rewrite bigcap_const.
+move: If oI => -> If; exists f; last by rewrite bigcap_image.
+by move=> i; apply: If; exists i.
+Qed.
+
+Lemma open_Gdelta S : open S -> Gdelta S.
+Proof. by exists (fun=> S)=> //; rewrite bigcap_const. Qed.
+
+Lemma GdeltaI : setI_closed Gdelta.
+Proof.
+move=> _ _ [F Fo ->] [G Go ->]; rewrite -bigcapI.
+by exists (fun i => F i `&` G i) => // i; apply: openI.
+Qed.
+
+Lemma GdeltaU : setU_closed Gdelta.
+Proof.
+move=> _ _ [F Fo ->] [G Go ->].
+apply/GdeltaP; exists [set F i.1 `&` G i.2 | i in [set: nat * nat]]; split.
+- by apply: (card_le_trans (card_image_le _ _)); exact: countableP.
+- by move=> ? [[i j] _ /= <-]; apply: openI.
+- 
+
+Definition Gdelta_dense S :=
+  exists2 F : (set T)^nat,
+    (forall i, open (F i) /\ dense (F i)) & S = \bigcap_i (F i).
+
+Definition Fsigma S :=
+  exists2 F : (set T)^nat, (forall i, closed (F i)) & S = \bigcup_i (F i).
+
+Lemma closed_Fsigma S : closed S -> Fsigma S.
+Proof. by exists (fun=> S)=> //; rewrite bigcup_const. Qed.
+
+End Gdelta_Fsigma.
+
 HB.mixin Record isContinuous {X Y : nbhsType} (f : X -> Y):= {
   continuous_fun : continuous f
 }.
