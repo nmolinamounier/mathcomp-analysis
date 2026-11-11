@@ -3267,6 +3267,22 @@ Unshelve. all: by end_near. Qed.
 
 End Baire.
 
+Lemma not_rational_Gdelta (R : realType) : ~ Gdelta (@rational R).
+Proof.
+apply/forall2NP => A; apply/not_andP => -[oA ratrA].
+have dense_A n : dense (A n).
+  move=> D D0 /(@dense_rat R D D0); apply/subset_nonempty; apply: setIS.
+  by rewrite -/(@rational R) ratrA; exact: bigcap_inf.
+have [/= B oB irratB] := @irrational_Gdelta R.
+pose C : (set R)^nat := fun n => A n `&` B n.
+have C0 : set0 = \bigcap_i C i by rewrite bigcapI -ratrA -irratB setICr.
+have /Baire : forall n, open (C n) /\ dense (C n).
+  move=> n; split.
+  - by apply: openI => //; apply oB.
+  - by apply: denseI => //; apply oB.
+by rewrite -C0; exact: dense0.
+Qed.
+
 (* TODO: generalize once PR#1107 is integrated *)
 Definition bounded_fun_norm (K : realType) (V : normedModType K)
     (W : normedModType K) (f : V -> W) :=

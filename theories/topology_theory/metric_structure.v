@@ -1,12 +1,11 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
 From mathcomp Require Import boot order ssralg ssrint ssrnum matrix.
-From mathcomp Require Import interval_inference rat interval zmodp vector.
-From mathcomp Require Import fieldext falgebra archimedean finmap.
+From mathcomp Require Import archimedean interval_inference rat interval.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
 From mathcomp Require Import boolp classical_sets contra reals.
-From mathcomp Require Import topology_structure uniform_structure
+From mathcomp Require Import topology_structure uniform_structure compact
   pseudometric_structure num_topology product_topology separation_axioms.
 
 (**md**************************************************************************)
