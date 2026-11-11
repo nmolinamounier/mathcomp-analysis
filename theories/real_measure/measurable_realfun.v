@@ -573,6 +573,12 @@ Qed.
 Lemma closed_measurable (A : set R) : closed A -> measurable A.
 Proof. by move/closed_openC/open_measurable/measurableC; rewrite setCK. Qed.
 
+Lemma Gdelta_measurable (S : set R) : Gdelta S -> measurable S.
+Proof.
+move=> [] B oB ->; apply: bigcapT_measurable => i.
+exact: open_measurable.
+Qed.
+
 Lemma compact_measurable (A : set R) : compact A -> measurable A.
 Proof.
 by move/compact_closed => /(_ (@Rhausdorff R)); exact: closed_measurable.

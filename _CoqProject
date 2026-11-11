@@ -121,8 +121,6 @@ theories/real_measure/lebesgue_measure.v
 theories/real_measure/measurable_realfun.v
 theories/real_measure/real_measure.v
 
-theories/borel_hierarchy.v
-
 theories/lebesgue_integral_theory/simple_functions.v
 theories/lebesgue_integral_theory/lebesgue_integral_definition.v
 theories/lebesgue_integral_theory/measurable_fun_approximation.v

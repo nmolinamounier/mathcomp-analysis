@@ -1009,6 +1009,25 @@ Definition interior_itv :=
 
 End interval_realType.
 
+Section irrational_Gdelta.
+Context {R : realType}.
+
+Lemma irrational_Gdelta : Gdelta_dense (@irrational R).
+Proof.
+rewrite irrationalE.
+have /pcard_eqP/bijPex[f bijf] := card_rat.
+pose f1 := 'pinv_(fun => 0%R) [set: rat] f.
+exists (fun n => ~` [set ratr (f1 n)]).
+  move=> n; rewrite openC; split; last exact: dense_set1C.
+  exact/accessible_closed_set1/hausdorff_accessible/Rhausdorff.
+apply/seteqP; split => [/= r/= rE n _/= rf1n|/=r rE q _/= [_ -> qr]].
+  by apply: (rE (f1 n)) => //=; exists (f1 n).
+apply: (rE (f q)) => //=.
+by rewrite /f1 pinvKV ?inE//=; exact: set_bij_inj bijf.
+Qed.
+
+End irrational_Gdelta.
+
 Section continuous_within_itvP.
 Context {R : realFieldType} {K : numDomainType} {U : pseudoMetricType K}.
 Implicit Type f : R -> U.

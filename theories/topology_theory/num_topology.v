@@ -878,4 +878,13 @@ Lemma itv_interiorE (l r : itv_bound R) :
                  (match r with BSide _ y => BLeft y  | _ => r end)].
 Proof. exact: EndlessDenseTopology.itv_interiorE. Qed.
 
+Lemma dense_set1C (r : R) : dense (~` [set r]).
+Proof.
+rewrite -set_itv1 setCitv closure_denseP /= closureU.
+rewrite !itv_closureE ?neitvE// -subTset.
+apply: (@subset_trans _ (_ `|` `]r, +oo[)); last first.
+  by apply: setUS; apply: subset_itvr; rewrite bnd_simp.
+by rewrite itv_setU_setT.
+Qed.
+
 End realField_topology.

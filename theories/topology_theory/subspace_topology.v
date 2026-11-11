@@ -305,6 +305,14 @@ move=> clpnA U Un0 [V oV UVA] [W cW UWA]; apply: clpnA => //; first split.
 - by rewrite UWA; exact: subIsetl.
 Qed.
 
+Lemma Gdelta_subspace_open (S : set (subspace A)) :
+  open A -> Gdelta S -> Gdelta (A `&` S).
+Proof.
+move=> oA [/= S_ oS_ US]; exists (fun n => A `&` (S_ n)).
+  by move=> ?; rewrite open_setSI.
+by rewrite bigcapIr// US.
+Qed.
+
 End Subspace.
 
 HB.instance Definition _ {T : ptopologicalType} (A : set T) :=

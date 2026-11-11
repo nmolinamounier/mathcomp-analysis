@@ -1089,10 +1089,13 @@ Notation closure_setC := closureC (only parsing).
 Arguments closureEbigcap_itvcc {T A}.
 Arguments interiorEbigcup_itvcc {T A}.
 
-Definition dense (T : topologicalType) (S : set T) :=
+Section dense.
+Implicit Types T: topologicalType.
+
+Definition dense T (S : set T) :=
   forall (O : set T), O !=set0 -> open O -> O `&` S !=set0.
 
-Lemma denseNE (T : topologicalType) (S : set T) : ~ dense S ->
+Lemma denseNE T (S : set T) : ~ dense S ->
   exists O, (exists x, open_nbhs x O) /\ (O `&` S = set0).
 Proof.
 rewrite /dense /open_nbhs.
@@ -1100,13 +1103,22 @@ move=> /existsNP[X /not_implyP[[x Xx] /not_implyP[ Ox /forallNP A]]].
 by exists X; split; [exists x | rewrite -subset0; apply/A].
 Qed.
 
-Lemma denseI (T : topologicalType) (A B : set T) :
+Lemma denseI T (A B : set T) :
   open A -> dense A -> dense B -> dense (A `&` B).
 Proof.
 move=> oA dA dB C C0 oC.
 have CA0 : C `&` A !=set0 by exact: dA.
 suff: (C `&` A) `&` B !=set0 by rewrite setIA.
 by apply: dB => //; exact: openI.
+Qed.
+
+Lemma closure_denseP T (A : set T) : dense A <-> closure A = [set: T].
+Proof.
+rewrite -subTset; split=> [dA x _ V +|+ U [x Ux] oU].
+- rewrite nbhsE => -[U [oU Ux] UV].
+  by have [|{Ux} x [/UV]] := dA U _ oU; exists x.
+- case/(_ x Logic.I U _) => [|y []]; last by exists y.
+  by apply: open_nbhs_nbhs.
 Qed.
 
 Lemma dense0 {R : ptopologicalType} : ~ dense (@set0 R).
@@ -1116,6 +1128,8 @@ apply/not_implyP; split; first exact/set0P/setT0.
 apply/not_implyP; split; first exact: openT.
 by rewrite setTI => -[].
 Qed.
+
+End dense.
 
 Section basis.
 Context {T : topologicalType}.
@@ -1229,32 +1243,35 @@ Notation clopen_comp := preimage_clopen (only parsing).
 Section Gdelta_Fsigma.
 Context {T : topologicalType}.
 Implicit Type S : set T.
+Local Open Scope card_scope.
 
 Definition Gdelta S :=
   exists2 F : (set T)^nat, (forall i, open (F i)) & S = \bigcap_i (F i).
 
-Lemma GdeltaP S :
-  Gdelta S <-> 
-  exists (I : set (set T)), [/\ 
-    countable I, 
-    forall A, I A -> open A &
-    S = \bigcap_(A in I) A
-  ].
-Proof.
-split=> [[F oF ->]|[I [+ oI ->]]].
-  exists (range F); split=> //.
-  - exact: card_image_le.
-  - move=> _ [i _ <-]; exact: oF.
-  - by rewrite bigcap_image.
-case/pfcard_geP => [->|/surjfunPex[f If]].
-  rewrite bigcap_set0; exists (fun=> setT) => [_|]; first exact: openT.
-  by rewrite bigcap_const.
-move: If oI => -> If; exists f; last by rewrite bigcap_image.
-by move=> i; apply: If; exists i.
-Qed.
-
 Lemma open_Gdelta S : open S -> Gdelta S.
 Proof. by exists (fun=> S)=> //; rewrite bigcap_const. Qed.
+
+Lemma GdeltaT : Gdelta [set: T].
+Proof. by apply: open_Gdelta; exact: openT. Qed.
+
+Lemma Gdelta0 : Gdelta (@set0 T).
+Proof. by apply: open_Gdelta; exact: open0. Qed.
+
+Lemma GdeltaP S :
+  Gdelta S <-> 
+  exists (U : Type) (I : set U) (F : U -> set T), [/\ 
+    countable I, 
+    forall i, I i -> open (F i) &
+    S = \bigcap_(i in I) F i
+  ].
+Proof.
+split=> [[F oF ->]|]; first by exists nat, [set: nat], F.
+move=> [U [I [F [cI oF ->]]]].
+case/pfcard_geP : cI => [->|/surjfunPex[f /[dup] imf ->]].
+  by rewrite bigcap_set0; exact: GdeltaT.
+rewrite bigcap_image; exists (F \o f) => //= i.
+by apply: oF; rewrite imf; exists i.
+Qed.
 
 Lemma GdeltaI : setI_closed Gdelta.
 Proof.
@@ -1264,11 +1281,30 @@ Qed.
 
 Lemma GdeltaU : setU_closed Gdelta.
 Proof.
-move=> _ _ [F Fo ->] [G Go ->].
-apply/GdeltaP; exists [set F i.1 `&` G i.2 | i in [set: nat * nat]]; split.
-- by apply: (card_le_trans (card_image_le _ _)); exact: countableP.
-- by move=> ? [[i j] _ /= <-]; apply: openI.
-- 
+move=> _ _ [F Fo ->] [G Go ->]; apply/GdeltaP. 
+exists (nat * nat)%type, [set: nat * nat], (fun i => F i.1 `|` G i.2)
+  ; split => //=.
+- by move=> [i j] _ /=; apply: openU.
+- by rewrite -setXTT (bigcap_setX (fun i j => F i `|` G j)) setU_bigcap.
+Qed.
+
+Lemma countable_Gdelta_bigcap (I : Type) (F : I -> set T) (J : set I) :
+  countable J -> (forall i, J i -> Gdelta (F i)) ->
+  Gdelta (\bigcap_(i in J) F i).
+Proof.
+move=> cJ GdF.
+have [f hf] : exists (f : I -> nat -> set T), forall i, J i ->
+    (forall n, open (f i n)) /\ F i = \bigcap_j f i j.
+  apply/ex_of_sigT; apply: (cond_choice J 
+    (fun i fi => (forall n, open (fi n)) /\ _ = \bigcap_j fi j)
+  ) => /= i Ji.
+  by case/GdF : Ji => [f o_f ->]; exists f.
+apply/GdeltaP; eexists _, (J `*` [set: nat]), (fun p => f p.1 p.2); split=> /=.
+- by apply: countableX.
+- by move=> [i n] /= [/hf[+ _] _]; exact.
+- under eq_bigcapr => i /hf[_ ->] do [].
+  by rewrite bigcap_setX.
+Qed.
 
 Definition Gdelta_dense S :=
   exists2 F : (set T)^nat,
@@ -1279,6 +1315,64 @@ Definition Fsigma S :=
 
 Lemma closed_Fsigma S : closed S -> Fsigma S.
 Proof. by exists (fun=> S)=> //; rewrite bigcup_const. Qed.
+
+Lemma FsigmaCP S : Fsigma (~` S) <-> Gdelta S.
+Proof.
+split=> [[F cF /(canRL setCK) ->]|[F oF ->]].
+- rewrite setC_bigcup; exists (setC \o F) => //.
+  by move=> ?; apply: closed_openC.
+- rewrite setC_bigcap; exists (setC \o F) => //.
+  by move=> ?; apply: open_closedC.
+Qed.
+
+Lemma GdeltaCP S : Gdelta (~` S) <-> Fsigma S.
+Proof. by rewrite -FsigmaCP setCK. Qed.
+
+Lemma FsigmaT : Fsigma [set: T].
+Proof. by apply/GdeltaCP; rewrite setCT; exact: Gdelta0. Qed.
+
+Lemma Fsigma0 : Fsigma (@set0 T).
+Proof. by apply/GdeltaCP; rewrite setC0; exact: GdeltaT. Qed.
+
+Lemma FsigmaP S :
+  Fsigma S <-> 
+  exists (U : Type) (I : set U) (F : U -> set T), [/\ 
+    countable I, 
+    forall i, I i -> closed (F i) &
+    S = \bigcup_(i in I) F i
+  ].
+Proof.
+rewrite -GdeltaCP GdeltaP -propeqE.
+apply: eq_exists => U; apply: eq_exists => I.
+apply/propeqP; split=> [[F [cI oF +]]|[F [cI cF ->]]].
+- move/(canRL setCK) => ->; exists (setC \o F); split=> //=.
+  + by move=> ? /oF /open_closedC.
+  + exact: setC_bigcap.
+- exists (setC \o F); split=> //=.
+  + by move=> ? /cF /closed_openC.
+  + exact: setC_bigcup.
+Qed.
+
+Lemma FsigmaI : setI_closed Fsigma.
+Proof.
+move=> A B /GdeltaCP FsA /GdeltaCP FsB.
+by apply/GdeltaCP; rewrite setCI; apply: GdeltaU.
+Qed.
+
+Lemma FsigmaU : setU_closed Fsigma.
+Proof.
+move=> A B /GdeltaCP FsA /GdeltaCP FsB.
+by apply/GdeltaCP; rewrite setCU; apply: GdeltaI.
+Qed.
+
+Lemma countable_Fsigma_bigcup (I : Type) (F : I -> set T) (J : set I) :
+  countable J -> (forall i, J i -> Fsigma (F i)) ->
+  Fsigma (\bigcup_(i in J) F i).
+Proof.
+move=> cJ FsF; apply/GdeltaCP.
+rewrite setC_bigcup; apply: countable_Gdelta_bigcap => //.
+by move=> i /FsF /GdeltaCP.
+Qed.
 
 End Gdelta_Fsigma.
 
