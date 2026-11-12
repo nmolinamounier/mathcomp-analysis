@@ -2738,11 +2738,7 @@ Proof. by apply/eqP => /seteqP[] /(_ point) /(_ Logic.I). Qed.
 Lemma cond_choice (U : Type) (P : set U) (Q : U -> T -> Prop) :
   (forall x : U, P x -> exists y : T, Q x y) ->
   { f : U -> T & forall x, P x -> Q x (f x) }.
-Proof.
-move=> hex; apply: (@choice _ _ (fun x fx => P x -> Q x fx)) => x.
-case: (EM (P x)) => [/hex[y Qxy]|nPx]; first by exists y.
-by exists point.
-Qed.
+Proof. exact: (cond_xchoice _ _ point). Qed.
 
 End PointedTheory.
 Arguments cond_choice {T U} P Q.

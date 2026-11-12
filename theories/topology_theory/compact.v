@@ -2,8 +2,8 @@
 From HB Require Import structures.
 From mathcomp Require Import boot order algebra finmap.
 From mathcomp Require Import all_classical.
-From mathcomp Require Import interval_inference reals topology_structure.
-From mathcomp Require Import uniform_structure pseudometric_structure.
+From mathcomp Require Import interval_inference reals topology_structure
+  separation_axioms.
 
 (**md**************************************************************************)
 (* # Compactness                                                              *)
@@ -49,56 +49,6 @@ Lemma inferP (P : Prop) : P -> infer P. Proof. by []. Qed.
 
 Section Compact.
 Context {T : topologicalType}.
-
-Definition cluster (F : set_system T) := [set p : T | F `#` nbhs p].
-
-Lemma cluster_nbhs t : cluster (nbhs t) t.
-Proof. by move=> A B /nbhs_singleton At /nbhs_singleton Bt; exists t. Qed.
-
-Lemma clusterEonbhs F : cluster F = [set p | F `#` open_nbhs p].
-Proof. by under eq_fun do rewrite -meets_openr. Qed.
-
-Lemma clusterE F : cluster F = \bigcap_(A in F) (closure A).
-Proof. by rewrite predeqE => p; split=> cF ????; apply: cF. Qed.
-
-Lemma closureEcluster E : closure E = cluster (globally E).
-Proof. by rewrite closureEnbhs. Qed.
-
-Lemma cvg_cluster F G : F --> G -> cluster F `<=` cluster G.
-Proof. by move=> sGF p Fp P Q GP Qp; apply: Fp Qp; apply: sGF. Qed.
-
-Lemma cluster_cvgE F :
-  Filter F ->
-  cluster F = [set p | exists2 G, ProperFilter G & G --> p /\ F `<=` G].
-Proof.
-move=> FF; have [F0|nF0] := pselect (F set0).
-  have -> : cluster F = set0.
-    by rewrite -subset0 clusterE => x /(_ set0 F0); rewrite closure0.
-  by apply/esym; rewrite -subset0 => p [? PG [_ /(_ set0 F0)]]; apply PG.
-rewrite predeqE => p; have PF : ProperFilter F by [].
-split=> [clFp|[G Gproper [cvGp sFG]] A B]; last first.
-  by move=> /sFG GA /cvGp GB; apply: (@filter_ex _ G); apply: filterI.
-exists (filter_from (\bigcup_(A in F) [set A `&` B | B in nbhs p]) id).
-  apply: filter_from_proper; last first.
-    by move=> _ [A FA [B p_B <-]]; have := clFp _ _ FA p_B.
-  apply: filter_from_filter.
-    exists setT; exists setT; first exact: filterT.
-    by exists setT; [apply: filterT|rewrite setIT].
-  move=> _ _ [A1 FA1 [B1 p_B1 <-]] [A2 FA2 [B2 p_B2 <-]].
-  exists (A1 `&` B1 `&` (A2 `&` B2)) => //; exists (A1 `&` A2).
-    exact: filterI.
-  by exists (B1 `&` B2); [apply: filterI|rewrite setIACA].
-split.
-  move=> A p_A; exists A => //; exists setT; first exact: filterT.
-  by exists A => //; rewrite setIC setIT.
-move=> A FA; exists A => //; exists A => //; exists setT; first exact: filterT.
-by rewrite setIT.
-Qed.
-
-Lemma closureEcvg (E : set T):
-  closure E =
-  [set p | exists2 G, ProperFilter G & G --> p /\ globally E `<=` G].
-Proof. by rewrite closureEcluster cluster_cvgE. Qed.
 
 Definition compact A := forall (F : set_system T),
   ProperFilter F -> F A -> A `&` cluster F !=set0.
@@ -320,16 +270,14 @@ Definition closed_fam_of (A : set T) I (D : set I) (f : I -> set T) :=
   exists2 g : I -> set T, (forall i, D i -> closed (g i)) &
     forall i, D i -> f i = A `&` g i.
 
-End Covers.
-
-Section PCovers.
-Context {T : ptopologicalType}.
-
 Lemma compact_In0 :
   compact = [set A | forall (I : choiceType) (D : set I) (f : I -> set T),
     closed_fam_of A D f -> finI D f -> \bigcap_(i in D) f i !=set0].
 Proof.
 rewrite predeqE => A; split=> [Aco I D f [g gcl feAg] finIf|Aco F FF FA].
+  case: (pselectT T) => [/setF_eq0 h0|point].
+    move: finIf => /(_ fset0 ltac:(done)).
+    by rewrite set_fset0 bigcap_set0 h0 => -[?].
   case: (pselect (exists i, D i)) => [[i Di] | /asboolP]; last first.
     by rewrite asbool_neg => /forallp_asboolPn D0; exists point => ? /D0.
   have [|p [Ap clfinIfp]] := Aco _ (finI_filter finIf).
@@ -346,7 +294,7 @@ exists p; split=> [|B C FB p_C]; first by have /AclFIp [] := FA.
 by have /AclFIp [_] := FB; move=> /(_ _ p_C).
 Qed.
 
-Lemma compact_cover : compact = @cover_compact T.
+Lemma compact_cover : compact = cover_compact.
 Proof.
 rewrite compact_In0 cover_compactE predeqE => A.
 split=> [Aco I D f [g gop feAg] fcov|Aco I D f [g gcl feAg]].
@@ -367,6 +315,9 @@ split=> [Aco I D f [g gop feAg] fcov|Aco I D f [g gcl feAg]].
   rewrite asbool_neg => /existsp_asboolPn [p /asboolP].
   rewrite asbool_neg => /imply_asboolPn [Ap nUfp].
   by exists p => i D'i; split=> // fip; apply: nUfp; exists i.
+case: (pselectT T) => [/setF_eq0 h0|point].
+  move=> /(_ fset0 ltac:(done)).
+  by rewrite set_fset0 bigcap_set0 h0 => -[?].
 case: (pselect (exists i, D i)) => [[j Dj] | /asboolP]; last first.
   by rewrite asbool_neg => /forallp_asboolPn D0 => _; exists point => ? /D0.
 apply: contraPP => /asboolP; rewrite asbool_neg => /forallp_asboolPn If0.
@@ -391,7 +342,7 @@ have /Ifp := D'k; rewrite feAg; first by have /sD := D'k; rewrite inE.
 by move=> [/sAnfcov [i D'i [_ nfip]] _]; have /Ifp := D'i.
 Qed.
 
-End PCovers.
+End Covers.
 
 Lemma finite_compact {X : topologicalType} (A : set X) :
   finite_set A -> compact A.
@@ -401,7 +352,7 @@ case/finite_setP=> n; elim: n A => [A|n ih A /eq_cardSP[x Ax /ih ?]].
 by rewrite -(setD1K Ax); apply: compactU => //; exact: compact_set1.
 Qed.
 
-Lemma clopen_countable {T : ptopologicalType}:
+Lemma clopen_countable {T : topologicalType}:
   compact [set: T] -> @second_countable T -> countable (@clopen T).
 Proof.
 move=> cmpT [B /fset_subset_countable cntB] [obase Bbase].
@@ -430,49 +381,80 @@ move=> /DsubC /= [y /= yfs hyz]; exists (h' y) => //.
 by rewrite set_imfset /=; exists y.
 Qed.
 
-Lemma compact_cauchy_cvg {T : puniformType} (U : set T) (F : set_system T) :
-  ProperFilter F -> cauchy F -> F U -> compact U -> cvg F.
-Proof.
-move=> PF cf FU /(_ F PF FU) [x [_ clFx]]; apply: (cvgP x).
-apply/cvg_entourageP => E entE.
-have : nbhs entourage (split_ent E) by rewrite nbhs_filterE.
-move=> /(cf (split_ent E))[] [D1 D2]/= /[!nbhs_simpl] -[FD1 FD2 D1D2E].
-have : nbhs x (xsection (split_ent E) x) by exact: nbhs_entourage.
-move=> /(clFx _ (xsection (split_ent E) x) FD1)[z [Dz /xsectionP Exz]].
-by near=> t; apply/(entourage_split z entE Exz)/D1D2E; split => //; near: t.
-Unshelve. all: by end_near. Qed.
+Section compact_separation.
 
-Lemma compact_second_countable {R : realType} {T : pseudoPMetricType R} :
-  compact [set: T] -> @second_countable T.
+Section hausdorff.
+Context (T : hausdorffType).
+
+Lemma compact_closed (A : set T) : compact A -> closed A.
 Proof.
-have npos n : (0:R) < n.+1%:R^-1 by [].
-pose f n (z : T): set T := (ball z (PosNum (npos n))%:num)°.
-move=> cmpt; have h n : finite_subset_cover [set: T] (f n) [set: T].
-  move: cmpt; rewrite compact_cover; apply.
-  - by move=> z _; rewrite /f; exact: open_interior.
-  - by move=> z _; exists z => //; rewrite /f /interior; exact: nbhsx_ballx.
-pose h' n := cid (iffLR (exists2P _ _) (h n)).
-pose h'' n := projT1 (h' n).
-pose B := \bigcup_n (f n) @` [set` h'' n]; exists B;[|split].
-- apply: bigcup_countable => // n _; apply: finite_set_countable.
-  exact/finite_image/ finite_fset.
-- by move => ? [? _ [? _ <-]]; exact: open_interior.
-- move=> x V /nbhs_ballP [] _/posnumP[eps] ballsubV.
-  have [//|N] := @ltr_add_invr R 0%R (eps%:num/2) _; rewrite add0r => deleps.
-  have [w wh fx] : exists2 w : T, w \in h'' N & f N w x.
-    by have [_ /(_ x) [// | w ? ?]] := projT2 (h' N); exists w.
-  exists (f N w); first split => //; first (by exists N).
-  apply: (subset_trans _ ballsubV) => z bz.
-  rewrite [_%:num]splitr; apply: (@ball_triangle _ _ w).
-    by apply: (le_ball (ltW deleps)); apply/ball_sym; apply: interior_subset.
-  by apply: (le_ball (ltW deleps)); apply: interior_subset.
+move=> Aco p clAp; have pA := [elaborate @withinT _ (nbhs p) A _].
+have [q [Aq clsAp_q]] := [elaborate Aco _ _ pA]. 
+rewrite (hausdorffP p q) //.
+by apply: cvg_cluster clsAp_q; apply: cvg_within.
 Qed.
 
-Lemma clopen_surj {R : realType} {T : pseudoPMetricType R} :
-  compact [set: T] -> $|{surjfun [set: nat] >-> @clopen T}|.
+Lemma compact_cluster_set1 (x : T) F V :
+  compact V -> nbhs x V -> 
+  ProperFilter F -> F V -> cluster F = [set x] -> F --> x.
 Proof.
-move=> cmptT.
-suff : @clopen T = set0 \/ $|{surjfun [set: nat] >-> @clopen T}|.
-  by case => //; rewrite eqEsubset => -[/(_ _ clopenT)].
-exact/pfcard_geP/clopen_countable/compact_second_countable.
+move=> cptV nxV PF FV clFx1 U nbhsU; rewrite nbhs_simpl.
+wlog oU : U nbhsU / open U.
+  rewrite /= nbhsE in nbhsU; case: nbhsU => O oO OsubU /(_ O) WH.
+  by apply: (filterS OsubU); apply: WH; [exact: open_nbhs_nbhs | by case: oO].
+have /compact_near_coveringP : compact (V `\` U).
+  apply: (subclosed_compact _ cptV) => //.
+  by apply: closedI; [exact: compact_closed | exact: open_closedC].
+move=> /(_ _ (powerset_filter_from F) (fun W x => ~ W x))[].
+  move=> z [Vz ?]; have zE : x <> z by move/nbhs_singleton: nbhsU => /[swap] ->.
+  have : ~ cluster F z by move: zE; apply: contra_not; rewrite clFx1 => ->.
+  case/existsNP=> C /existsPNP [D] FC /existsNP [Dz] /nonemptyPn.
+  rewrite setIC => /disjoints_subset CD0; exists (D, [set W | F W /\ W `<=` C]).
+    by split; rewrite //= nbhs_simpl; exact: powerset_filter_fromP.
+  by case => t W [Dt] [FW] /subsetCP; apply; apply: CD0.
+move=> M [MF ME2 [W] MW /(_ _ MW) VUW].
+apply: (@filterS _ _ _ (V `&` W)); last by apply: filterI => //; exact: MF.
+by move=> t [Vt Wt]; apply: contrapT => Ut; exact: (VUW t).
 Qed.
+
+Lemma compact_precompact (A : set T) :
+  compact A -> precompact A.
+Proof.
+by move=> c; rewrite precompactE -(closure_id _).1//; exact: compact_closed.
+Qed.
+
+Lemma compact_regular : 
+  compact [set: T] -> regular_space T.
+Proof.
+move=> cT x F clF nFx.
+have [[U_ V_] /= hUV] := @open_separator_ex T x.
+have coF : cover_compact F. 
+  by rewrite -compact_cover; apply: (subclosed_compact clF cT).
+have F_neq y : F y -> y != x by apply: contraPneq => ->.
+have oV_ y : F y -> open (V_ y) by move=> /F_neq /hUV[_ []].
+have Fcov : F `<=` cover F V_.
+  move=> y Fy; exists y => //.
+  apply: nbhs_singleton; apply: open_nbhs_nbhs.
+  by apply hUV; apply: F_neq.
+have [G GF FcV] := coF T F V_ oV_ Fcov.
+exists (\bigcap_(y in [set` G]) U_ y).
+exists (\bigcup_(y in [set` G]) V_ y) => /=; split.
+- apply: filter_bigI => y /GF /set_mem Fy.
+  by apply: open_nbhs_nbhs; apply hUV; apply: F_neq.
+- apply: open_set_nbhs => //.
+  by apply: bigcup_open => ? /GF /set_mem /oV_.
+- apply/disj_setPRL => z [i Gi Vz] /(_ _ Gi).
+  have : [disjoint U_ i & V_ i].
+    by apply hUV; apply: F_neq; apply/set_mem; apply: GF.
+  by move/disj_setPLR/[apply].
+Qed.
+
+Lemma compact_normal : 
+  compact [set: T] -> normal_space T.
+Proof.
+
+
+End hausdorff.
+
+
+End compact_separation.

@@ -239,6 +239,16 @@ have [/cid[]//|NT] := pselect (exists t : T, True); first by right.
 by left=> t; case: NT; exists t.
 Qed.
 
+Lemma cond_xchoice (T U : Type) (P : T -> Prop) (Q : T -> U -> Prop) (x0 : U) :
+  (forall x : T, P x -> exists y : U, Q x y) ->
+  { f : T -> U & forall x : T, P x -> Q x (f x) }.
+Proof.
+move=> hex; apply: (@choice _ _ (fun x fx => P x -> Q x fx)) => x.
+case: (EM (P x)) => [/hex[y Qxy]|nPx]; first by exists y.
+by exists x0.
+Qed.
+Arguments cond_xchoice {T U} P Q x0.
+
 Lemma classic : mclassic.
 Proof.
 split=> [|T]; first exact: pselect.

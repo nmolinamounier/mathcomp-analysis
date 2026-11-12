@@ -3,7 +3,7 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra finmap all_classical.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import topology_structure hausdorff uniform_structure.
+From mathcomp Require Import topology_structure uniform_structure.
 From mathcomp Require Import product_topology pseudometric_structure.
 
 (**md**************************************************************************)

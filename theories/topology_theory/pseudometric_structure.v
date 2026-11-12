@@ -2,7 +2,7 @@
 From HB Require Import structures.
 From mathcomp Require Import boot order algebra archimedean all_classical.
 From mathcomp Require Import interval_inference reals topology_structure.
-From mathcomp Require Import uniform_structure.
+From mathcomp Require Import uniform_structure compact.
 
 (**md**************************************************************************)
 (* # PseudoMetric Spaces                                                      *)
@@ -358,6 +358,41 @@ Proof.
 rewrite -(withinET (F := nbhs p)) cvg_withinP withinET.
 apply/propeqP; apply: eq_forall => u; congr (_ -> _).
 by apply/propeqP; split=> [[]|].
+Qed.
+
+Lemma compact_second_countable {R : realType} {T : pseudoPMetricType R} :
+  compact [set: T] -> @second_countable T.
+Proof.
+have npos n : (0:R) < n.+1%:R^-1 by [].
+pose f n (z : T): set T := (ball z (PosNum (npos n))%:num)°.
+move=> cmpt; have h n : finite_subset_cover [set: T] (f n) [set: T].
+  move: cmpt; rewrite compact_cover; apply.
+  - by move=> z _; rewrite /f; exact: open_interior.
+  - by move=> z _; exists z => //; rewrite /f /interior; exact: nbhsx_ballx.
+pose h' n := cid (iffLR (exists2P _ _) (h n)).
+pose h'' n := projT1 (h' n).
+pose B := \bigcup_n (f n) @` [set` h'' n]; exists B;[|split].
+- apply: bigcup_countable => // n _; apply: finite_set_countable.
+  exact/finite_image/ finite_fset.
+- by move => ? [? _ [? _ <-]]; exact: open_interior.
+- move=> x V /nbhs_ballP [] _/posnumP[eps] ballsubV.
+  have [//|N] := @ltr_add_invr R 0%R (eps%:num/2) _; rewrite add0r => deleps.
+  have [w wh fx] : exists2 w : T, w \in h'' N & f N w x.
+    by have [_ /(_ x) [// | w ? ?]] := projT2 (h' N); exists w.
+  exists (f N w); first split => //; first (by exists N).
+  apply: (subset_trans _ ballsubV) => z bz.
+  rewrite [_%:num]splitr; apply: (@ball_triangle _ _ w).
+    by apply: (le_ball (ltW deleps)); apply/ball_sym; apply: interior_subset.
+  by apply: (le_ball (ltW deleps)); apply: interior_subset.
+Qed.
+
+Lemma clopen_surj {R : realType} {T : pseudoPMetricType R} :
+  compact [set: T] -> $|{surjfun [set: nat] >-> @clopen T}|.
+Proof.
+move=> cmptT.
+suff : @clopen T = set0 \/ $|{surjfun [set: nat] >-> @clopen T}|.
+  by case => //; rewrite eqEsubset => -[/(_ _ clopenT)].
+exact/pfcard_geP/clopen_countable/compact_second_countable.
 Qed.
 
 Section entourages.

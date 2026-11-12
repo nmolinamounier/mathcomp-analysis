@@ -1089,6 +1089,63 @@ Notation closure_setC := closureC (only parsing).
 Arguments closureEbigcap_itvcc {T A}.
 Arguments interiorEbigcup_itvcc {T A}.
 
+
+
+Section cluster.
+Context (T : topologicalType).
+
+Definition cluster (F : set_system T) := [set p : T | F `#` nbhs p].
+
+Lemma cluster_nbhs t : cluster (nbhs t) t.
+Proof. by move=> A B /nbhs_singleton At /nbhs_singleton Bt; exists t. Qed.
+
+Lemma clusterEonbhs F : cluster F = [set p | F `#` open_nbhs p].
+Proof. by under eq_fun do rewrite -meets_openr. Qed.
+
+Lemma clusterE F : cluster F = \bigcap_(A in F) (closure A).
+Proof. by rewrite predeqE => p; split=> cF ????; apply: cF. Qed.
+
+Lemma closureEcluster E : closure E = cluster (globally E).
+Proof. by rewrite closureEnbhs. Qed.
+
+Lemma cvg_cluster F G : F --> G -> cluster F `<=` cluster G.
+Proof. by move=> sGF p Fp P Q GP Qp; apply: Fp Qp; apply: sGF. Qed.
+
+Lemma cluster_cvgE F :
+  Filter F ->
+  cluster F = [set p | exists2 G, ProperFilter G & G --> p /\ F `<=` G].
+Proof.
+move=> FF; have [F0|nF0] := pselect (F set0).
+  have -> : cluster F = set0.
+    by rewrite -subset0 clusterE => x /(_ set0 F0); rewrite closure0.
+  by apply/esym; rewrite -subset0 => p [? PG [_ /(_ set0 F0)]]; apply PG.
+rewrite predeqE => p; have PF : ProperFilter F by [].
+split=> [clFp|[G Gproper [cvGp sFG]] A B]; last first.
+  by move=> /sFG GA /cvGp GB; apply: (@filter_ex _ G); apply: filterI.
+exists (filter_from (\bigcup_(A in F) [set A `&` B | B in nbhs p]) id).
+  apply: filter_from_proper; last first.
+    by move=> _ [A FA [B p_B <-]]; have := clFp _ _ FA p_B.
+  apply: filter_from_filter.
+    exists setT; exists setT; first exact: filterT.
+    by exists setT; [apply: filterT|rewrite setIT].
+  move=> _ _ [A1 FA1 [B1 p_B1 <-]] [A2 FA2 [B2 p_B2 <-]].
+  exists (A1 `&` B1 `&` (A2 `&` B2)) => //; exists (A1 `&` A2).
+    exact: filterI.
+  by exists (B1 `&` B2); [apply: filterI|rewrite setIACA].
+split.
+  move=> A p_A; exists A => //; exists setT; first exact: filterT.
+  by exists A => //; rewrite setIC setIT.
+move=> A FA; exists A => //; exists A => //; exists setT; first exact: filterT.
+by rewrite setIT.
+Qed.
+
+Lemma closureEcvg (E : set T):
+  closure E =
+  [set p | exists2 G, ProperFilter G & G --> p /\ globally E `<=` G].
+Proof. by rewrite closureEcluster cluster_cvgE. Qed.
+
+End cluster.
+
 Section dense.
 Implicit Types T: topologicalType.
 
