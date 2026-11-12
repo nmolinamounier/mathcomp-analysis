@@ -857,6 +857,26 @@ apply: (iffP idP)=> [/asboolPn NP x|NP].
 by apply/asboolP=> -[x Px Qx]; have /not_andP := NP x; exact.
 Qed.
 
+Lemma exists_existsP T U (P : T -> U -> Prop) :
+  (exists x y, P x y) <-> (exists p, P p.1 p.2).
+Proof.
+by split=> [[x [y Pxy]]|[[x y] /= Pxy]]; [exists (x, y)|exists x, y].
+Qed.
+
+Lemma exists_exists2P T U (P Q : T -> U -> Prop) : 
+  (exists x, exists2 y, P x y & Q x y) 
+  <-> (exists2 p, P p.1 p.2 & Q p.1 p.2).
+Proof. by split=> [[x [y ? ?]]|[[x y] ? ?]]; [exists (x, y)|exists x, y]. Qed.
+
+Lemma exists_pairfunP X T U (P : (X -> T) -> (X -> U) -> Prop) :
+  (exists fg : (X -> T) * (X -> U), P fg.1 fg.2)
+  <-> (exists F : X -> T * U, P (fst \o F) (snd \o F)).
+Proof.
+split=> [[[f g] Pfg]|[F PF]].
+- by exists (fun x => (f x, g x)).
+- by exists (fst \o F, snd \o F).
+Qed.
+
 Section bigmaxmin.
 Local Notation max := Order.max.
 Local Notation min := Order.min.

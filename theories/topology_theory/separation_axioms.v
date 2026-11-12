@@ -59,11 +59,9 @@ Definition kolmogorov_space T := forall x y, x != y ->
 Definition accessible_space T := forall x y, x != y ->
   exists A : set T, [/\ open A, A x & ~ A y].
 
-Definition hausdorff_space T := forall p q : T, cluster (nbhs p) q -> p = q.
-
-Definition urysohn_space T := forall (x y : T), x != y -> 
-  exists AB, [/\
-    closed AB.1, closed AB.2, nbhs x AB.1, nbhs y AB.2 & [disjoint AB.1 & AB.2]
+Definition hausdorff_space T := forall x y : T, x != y ->
+  exists (A B : set T), [/\
+    nbhs x A, nbhs y B & [disjoint A & B]
   ].
 
 Definition regular_space T :=
@@ -73,25 +71,16 @@ Definition regular_space T :=
     ].
 
 Definition normal_space T :=
-  forall A : set T, closed A ->
-    filter_from (set_nbhs A) closure `=>` set_nbhs A.
-
-Definition completely_normal_space T :=
-  forall A B : set T, separated A B -> 
-    exists UV, [/\ set_nbhs A UV.1, set_nbhs B UV.2 & [disjoint UV.1 & UV.2]].
-
-Definition perfectly_normal_space T :=
-  normal_space T /\ forall A : set T, closed A -> Gdelta A.
+  forall A : set T, closed A -> 
+    forall U, set_nbhs A U ->
+      exists2 V, set_nbhs A V & closure V `<=` U.
 
 End point_separation_axioms.
 Arguments kolmogorov_space : clear implicits.
 Arguments accessible_space : clear implicits.
 Arguments hausdorff_space : clear implicits.
-Arguments urysohn_space : clear implicits.
 Arguments regular_space : clear implicits.
 Arguments normal_space : clear implicits.
-Arguments completely_normal_space : clear implicits.
-Arguments perfectly_normal_space : clear implicits.
 
 Section separation_equivalences.
 Context (T : topologicalType).
@@ -108,21 +97,44 @@ exists [set~ y]; split=> [||//=]; last by apply/eqP.
 by apply: closed_openC.
 Qed.
 
+Lemma cluster_hausdorffP : 
+  hausdorff_space T <->
+  (forall x y : T, cluster (nbhs x) y -> x = y).
+Proof.
+split; last first.
+  contra => -[x [y xy nsep]].
+  by exists x, y => // A B /nsep /[apply] /set0P.
+contra => -[x [y nsep xy]].
+exists x, y => // A B /nsep /[apply].
+by contra=> /disj_setPLR.
+Qed.
+
 Lemma open_hausdorffP :
   hausdorff_space T <->
-  (forall (x y : T), x != y -> exists2 AB, 
-    (AB.1 x /\ AB.2 y) &
-    [/\ open AB.1, open AB.2 & [disjoint AB.1 & AB.2]]).
+  forall (x y : T), x != y -> exists (A B : set T), 
+    [/\ open_nbhs x A, open_nbhs y B & [disjoint A & B]].
 Proof.
-split => [T_filterT2|T_openT2] x y.
-  have := contra_not (T_filterT2 x y); move=> + /eqP => /[apply].
-  move=> /existsNP[A] /existsNP[B] /not_implyP[xA] /not_implyP[yB].
-  move=> /nonemptyPn AIB_eq0.
-  move: xA yB; rewrite !nbhsE => -[oA [ooA oAx] oAA] [oB [ooB oBx] oBB].
-  by exists (oA, oB); rewrite ?inE; split => //; apply: subsetI_eq0 AIB_eq0.
-contra => /T_openT2[[A B] /= [Ax Bx] [oA oB AdB]].
-exists A, B; last split; [ exact: open_nbhs_nbhs .. |].
-by apply/disj_setPLR.
+split=> + x y => /[apply] -[A [B [An Bn dAB]]]; last first.
+  by exists A, B; split=> //; apply: open_nbhs_nbhs.
+exists A°, B°; split; [by split=> //; exact: open_interior .. |].
+move: dAB; rewrite -!(rwP disj_setPS); apply: subset_trans.
+by apply: setISS; exact: interior_subset.
+Qed.
+
+Lemma open_normalP :
+  normal_space T <->
+  forall (A : set T), closed A ->
+    forall U, open U -> A `<=` U ->
+      exists V, [/\ open V, A `<=` V & closure V `<=` U].
+Proof.
+apply/propeqP/eq_forall => A; apply/eq_forall => cA.
+apply/propeqP; split=> [hnb U oU AU|ho U AU].
+- have [|V AV cVU]:= hnb U; first by apply: open_set_nbhs.
+  exists V°; split=> //; first exact: open_interior.
+  by apply: subset_trans cVU; apply: closureS; exact: interior_subset.
+- have [|V [oV AV cVUo]] := ho U° _ AU; first exact: open_interior.
+  exists V; first by apply: open_set_nbhs.
+  apply: (subset_trans cVUo); exact: interior_subset.
 Qed.
 
 Lemma closed_normalP :
@@ -161,41 +173,6 @@ split.
   by apply/esym/closure_id; apply: open_closedC; exact: open_interior.
 Qed.
 
-Lemma open_normalP :
-  normal_space T <->
-  forall (G H : set T), open G -> open H -> G `|` H = [set: T] ->
-    exists UV, [/\ 
-      open UV.1 , open UV.2 ,
-      UV.1 `|` G = [set: T] , 
-      UV.2 `|` H = [set: T] & 
-      [disjoint UV.1 & UV.2]
-    ].
-Proof.
-rewrite closed_normalP; split.
-- move=> hc G H oG oH GHT.
-  have [] := hc (~` G) (~` H) (open_closedC oG) (open_closedC oH).
-    by apply/eqP; rewrite -setCU; apply: (canLR setCK); rewrite setC0.
-  move=> [U V] /= [ncGU ncHV /disj_setPS dUV].
-  have dUVo : [disjoint U° & V°].
-    apply/disj_setPS; apply: subset_trans dUV.
-    by apply: setISS; exact: interior_subset.
-  exists (U°, V°); split => //=; do ?exact: open_interior; by [
-    rewrite -setC0; apply: (canRL setCK); rewrite setCU; 
-    rewrite setIC; apply/subsets_disjoint
-  ].
-- move=> ho A B cA cB dAB.
-  have [] := ho (~`A) (~`B) (closed_openC cA) (closed_openC cB).
-    rewrite -setCI; apply: (canLR setCK); rewrite setCT.
-    by apply/eqP.
-  move=> [U V] /= [oU oV].
-  rewrite -setC0 => /(canLR setCK) + /(canLR setCK) + dUV.
-  rewrite !setCU !setCK !(setIC (~` _)).
-  move => /subsets_disjoint + /subsets_disjoint +.
-  have <- : U° = U by apply/interior_id.
-  have <- : V° = V by apply/interior_id.
-  by exists (U, V).
-Qed.
-
 End separation_equivalences.
 
 Section separation_implications.
@@ -210,8 +187,9 @@ Qed.
 
 Lemma hausdorff_accessible : hausdorff_space T -> accessible_space T.
 Proof.
-move=> /open_hausdorffP + x y xy => /(_ _ _ xy)[[A B] /= [xA yB] [oA oB dAB]].
-by exists A; split=> //; move/disj_setPRL : dAB; apply.
+move=> /open_hausdorffP T2 x y xy.
+have [A [B [[oA Ax] [oB By] dAB]]] := T2 x y xy.
+by exists A; split=> //; apply/(disj_setPRL dAB).
 Qed.
 
 Lemma urysohn_hausdorff : urysohn_space T -> hausdorff_space T.
@@ -858,10 +836,9 @@ Lemma open_separator_ex (x : T) :
     [/\ open_nbhs x (UV.1 y), open_nbhs y (UV.2 y) & 
       [disjoint UV.1 y & UV.2 y]].
 Proof.
-suff : exists (UV : T -> set T * set T), forall y, y != x ->
-    [/\ open_nbhs x (UV y).1, open_nbhs y (UV y).2 & 
-      [disjoint (UV y).1 & (UV y).2]].
-  by case=> UV hUV; exists (fst \o UV, snd \o UV).
+apply/(exists_pairfunP (fun f g => forall y, _ -> 
+  [/\ _ _ (f y), _ _ (g y) & [disjoint f y & g y]]
+)).
 apply/ex_of_sigT/(cond_choice _ (fun y UV => 
   [/\ _ x UV.1, _ y UV.2 & [disjoint UV.1 & UV.2]])
 ) => y yx /=.
@@ -1016,7 +993,91 @@ End hausdorff_ind.
 Lemma hausdorff_ind (P : topologicalType -> Prop) :
   (forall T : hausdorffType, P T) ->
   forall T, hausdorff_space T -> P T.
-Proof. by move=> hAcc [T []] >; apply: hausdorff_ind_. Qed.
+Proof. by move=> hHau [T []] >; apply: hausdorff_ind_. Qed.
+
+(* Theory of Urysohn spaces *)
+
+Section urysohn_theory.
+Context (T : urysohnType).
+
+Lemma closed_separator_ex (x : T) : 
+  exists (UV : (T -> set T) * (T -> set T)), forall y, y != x ->
+    [/\ closed (UV.1 y), closed (UV.2 y),
+      nbhs x (UV.1 y), nbhs y (UV.2 y) &
+      [disjoint UV.1 y & UV.2 y]].
+Proof.
+apply/(exists_pairfunP (fun f g => forall y, _ ->
+  [/\ _ (f y), _ (g y), _ (f y), _ (g y) & [disjoint f y & g y]]
+)).
+apply/ex_of_sigT/(cond_choice _ (fun y UV => 
+  [/\ _ UV.1, _ UV.2, _ UV.1, _ UV.2 & [disjoint UV.1 & UV.2]])
+) => y yx /=.
+have [[U V] /= [*]] := urysohnP y x yx.
+by exists (V, U); split=> //=; rewrite disj_set_sym.
+Qed.
+
+End urysohn_theory.
+
+Section urysohn_ind.
+Context (P : topologicalType -> Prop).
+Hypothesis hUry : forall T : urysohnType, P T.
+
+HB.declare Context (T : Type) & Topological T.
+Hypothesis uT : urysohn_space T.
+
+Lemma urysohn_ind_ : P T.
+Proof.
+pose T' : urysohnType := HB.pack T (Topological_isUrysohn.Build T uT).
+exact: (hUry T').
+Qed.
+ 
+End urysohn_ind.
+
+Lemma urysohn_ind (P : topologicalType -> Prop) :
+  (forall T : urysohnType, P T) ->
+  forall T, urysohn_space T -> P T.
+Proof. by move=> hUry [T []] >; apply: urysohn_ind_. Qed.
+
+(* Theory of regular spaces *)
+
+Section regular_theory.
+Context (T : regularType).
+
+Lemma regular_separator_ex (F : set T) : closed F ->
+  exists (UV : (T -> set T) * (T -> set T)), forall x, ~ F x ->
+    [/\ nbhs x (UV.1 x), set_nbhs F (UV.2 x) & [disjoint UV.1 x & UV.2 x]].
+Proof.
+move=> cF.
+apply/(exists_pairfunP (fun f g => forall x, _ ->
+  [/\ _ (f x), _ (g x) & [disjoint f x & g x]]
+)).
+apply/ex_of_sigT/(cond_choice _ (fun x UV => 
+  [/\ _ UV.1, _ UV.2 & [disjoint UV.1 & UV.2]]
+)) => /= x nFx.
+by have /exists_existsP := regularP x F cF nFx.
+Qed.
+
+End regular_theory.
+
+Section regular_ind.
+Context (P : topologicalType -> Prop).
+Hypothesis hReg : forall T : regularType, P T.
+
+HB.declare Context (T : Type) & Topological T.
+Hypothesis rT : regular_space T.
+
+Lemma regular_ind_ : P T.
+Proof.
+pose T' : regularType := HB.pack T (Topological_isRegular.Build T rT).
+exact: (hReg T').
+Qed.
+ 
+End regular_ind.
+
+Lemma regular_ind (P : topologicalType -> Prop) :
+  (forall T : regularType, P T) ->
+  forall T, regular_space T -> P T.
+Proof. by move=> hReg [T []] >; apply: regular_ind_. Qed.
 
 (*
 Section subspace_hausdorff.

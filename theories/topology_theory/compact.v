@@ -423,13 +423,13 @@ Proof.
 by move=> c; rewrite precompactE -(closure_id _).1//; exact: compact_closed.
 Qed.
 
-Lemma compact_regular : 
-  compact [set: T] -> regular_space T.
+Lemma compact_closed_separation (x : T) (F : set T) :
+  compact F -> ~ F x -> exists (U V : set T), [/\
+    nbhs x U, set_nbhs F V & [disjoint U & V]
+  ].
 Proof.
-move=> cT x F clF nFx.
-have [[U_ V_] /= hUV] := @open_separator_ex T x.
-have coF : cover_compact F. 
-  by rewrite -compact_cover; apply: (subclosed_compact clF cT).
+rewrite compact_cover => coF nFx.
+have [[U_ V_] /= hUV] := open_separator_ex x.
 have F_neq y : F y -> y != x by apply: contraPneq => ->.
 have oV_ y : F y -> open (V_ y) by move=> /F_neq /hUV[_ []].
 have Fcov : F `<=` cover F V_.
@@ -449,12 +449,36 @@ exists (\bigcup_(y in [set` G]) V_ y) => /=; split.
   by move/disj_setPLR/[apply].
 Qed.
 
-Lemma compact_normal : 
+Lemma hausdorff_compact_regular : 
+  compact [set: T] -> regular_space T.
+Proof.
+move=> cT x F clF nFx.
+apply: compact_closed_separation => //.
+by apply: (subclosed_compact _ cT).
+Qed.
+
+Lemma hausdorff_compact_normal : 
   compact [set: T] -> normal_space T.
 Proof.
-
+move=> /[dup] /hausdorff_compact_regular.
+apply: (@regular_ind (fun T => compact [set: T] -> normal_space T)).
+clear T => T cT.
+apply/closed_normalP => A B cA cB dAB.
+have [[U_ V_] /= hUV] := regular_separator_ex cA.
+have coB : cover_compact B.
+  by rewrite -compact_cover; apply: (subclosed_compact _ cT).
+have BcA : B `<=` ~` A by apply/disj_setPRL.
+have [||] := coB T B (interior \o U_).
+- by move=> ? ?; exact: open_interior.
+- by move=> x /[dup] Bx /BcA /hUV[Un Vn dUV]; exists x.
+move=> C CB Bcov.
+exists (\bigcap_(i in [set` C]) V_ i, \bigcup_(i in [set` C]) U_ i); split=> /=.
+- by apply: filter_bigI => i /CB /set_mem /BcA /hUV[].
+- by apply/set_nbhs_subsetP; apply: (subset_trans Bcov); exact: interior_bigcup.
+apply/disj_setPRL => x [i Ci Ux] /(_ i Ci).
+by move: Ci => /CB /set_mem /BcA /hUV[_ _] /disj_setPRL /[apply].
+Qed.
 
 End hausdorff.
-
 
 End compact_separation.
