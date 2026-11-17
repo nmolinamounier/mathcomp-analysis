@@ -63,22 +63,22 @@ Obligation Tactic := idtac.
 Local Open Scope classical_set_scope.
 Local Open Scope ring_scope.
 
-Definition entourage_ {R : numDomainType} {T T'} (ball : T -> R -> set T') :=
-  @filter_from R _ [set x | 0 < x] (fun e => [set xy | ball xy.1 e xy.2]).
+Definition dist_entourage {R : numDomainType} {T} (d : T -> T -> R) :=
+  @filter_from R _ [set x | 0 < x] (fun e => [set xy | d xy.1 xy.2 < e]).
 
-Lemma entourage_E {R : numDomainType} {T T'} (ball : T -> R -> set T') :
-  entourage_ ball =
-  @filter_from R _ [set x | 0 < x] (fun e => [set xy | ball xy.1 e xy.2]).
+Lemma dist_entourageE {R : numDomainType} {T} (d : T -> T -> R) :
+  dist_entourage d =
+  @filter_from R _ [set x | 0 < x] (fun e => [set xy | d xy.1 xy.2 < e]).
 Proof. by []. Qed.
 
 HB.mixin Record Uniform_isPseudoMetric d (R : numDomainType) M
     & Uniform d M := {
-  ball : M -> R -> M -> Prop ;
-  ball_center_subproof : forall x (e : R), 0 < e -> ball x e x ;
-  ball_sym_subproof : forall x y (e : R), ball x e y -> ball y e x ;
-  ball_triangle_subproof :
-    forall x y z e1 e2, ball x e1 y -> ball y e2 z -> ball x (e1 + e2) z;
-  entourageE_subproof : entourage = entourage_ ball
+  dist : M -> M -> R ;
+  dist_ge0 : forall (x y : M), dist x y >= 0 ;
+  distxx : forall (x : M), dist x x = 0 ;
+  dist_sym : forall (x y : M), dist x y = dist y x ;
+  dist_triangle : forall (y x z : M), dist x z <= dist x y + dist y z ;
+  entourageE_subproof : entourage = dist_entourage dist
 }.
 
 #[short(type="pseudoMetricType")]
@@ -91,8 +91,7 @@ HB.structure Definition PseudoPointedMetric d (R : numDomainType) :=
 
 HB.instance Definition _ d' d R (T : pseudoMetricType d R) :=
   Uniform_isPseudoMetric.Build d' R (with_fdisp d' T)
-    ball_center_subproof ball_sym_subproof ball_triangle_subproof
-    entourageE_subproof.
+    dist_ge0 distxx dist_sym dist_triangle entourageE_subproof.
 HB.instance Definition _ d' d R (T : pseudoPMetricType d R) :=
   PseudoPointedMetric.on (with_fdisp d' T).
 
@@ -100,54 +99,43 @@ HB.instance Definition _ d' d R (T : pseudoPMetricType d R) :=
 HB.factory Record Nbhs_isPseudoMetric d (R : numFieldType) M & Nbhs d M := {
   ent : set_system (M * M);
   nbhsE : nbhs = nbhs_ ent;
-  ball : M -> R -> M -> Prop ;
-  ball_center : forall x (e : R), 0 < e -> ball x e x ;
-  ball_sym : forall x y (e : R), ball x e y -> ball y e x ;
-  ball_triangle :
-    forall x y z e1 e2, ball x e1 y -> ball y e2 z -> ball x (e1 + e2) z;
-  entourageE : ent = entourage_ ball
+  dist : M -> M -> R ;
+  dist_ge0 : forall (x y : M), dist x y >= 0 ;
+  distxx : forall (x : M), dist x x = 0 ;
+  dist_sym : forall (x y : M), dist x y = dist y x ;
+  dist_triangle : forall (y x z : M), dist x z <= dist x y + dist y z ;
+  entourageE : ent = dist_entourage dist
 }.
 
 HB.builders Context d R M & Nbhs_isPseudoMetric d R M.
 Local Open Scope relation_scope.
 
-Let ball_le x : {homo ball x : e1 e2 / e1 <= e2 >-> e1 `<=` e2}.
-Proof.
-move=> e1 e2 le12 y xe1_y.
-move: le12; rewrite le_eqVlt => /orP [/eqP <- //|].
-rewrite -subr_gt0 => lt12.
-rewrite -[e2](subrK e1); apply: ball_triangle xe1_y.
-suff : ball x (PosNum lt12)%:num x by [].
-exact: ball_center.
-Qed.
-
 Let entourage_filter_subproof : Filter ent.
 Proof.
 rewrite entourageE; apply: filter_from_filter; first by exists 1 => /=.
-move=> _ _ /posnumP[e1] /posnumP[e2]; exists (Num.min e1 e2)%:num => //=.
-by rewrite subsetI; split=> ?; apply: ball_le;
-   rewrite num_le// ge_min lexx ?orbT.
+move=> _ _ /posnumP[e1] /posnumP[e2]; exists (Num.min e1%:num e2%:num) => //=.
+by rewrite subsetI; split=> ? /=; rewrite num_lt_min => /andP[].
 Qed.
 
 Let ball_sym_subproof A : ent A -> diagonal `<=` A.
 Proof.
 rewrite entourageE; move=> [e egt0 sbeA] xy xey.
-by apply: sbeA; rewrite /= xey; exact: ball_center.
+by apply: sbeA; rewrite /= xey distxx.
 Qed.
 
 Let ball_triangle_subproof A : ent A -> ent A^-1.
 Proof.
 rewrite entourageE => - [e egt0 sbeA].
-by exists e => // xy xye; apply: sbeA; exact: ball_sym.
+by exists e => // xy xye; apply: sbeA; rewrite /= dist_sym.
 Qed.
 
 Let entourageE_subproof A : ent A -> exists2 B, ent B & B \; B `<=` A.
 Proof.
 rewrite entourageE; move=> [_/posnumP[e] sbeA].
-exists [set xy | ball xy.1 (e%:num / 2) xy.2].
+exists [set xy | dist xy.1 xy.2 < e%:num / 2].
   by exists (e%:num / 2) => /=.
-move=> xy [z xzhe zyhe]; apply: sbeA.
-by rewrite [e%:num]splitr; exact: ball_triangle zyhe.
+move=> xy [z /= xzhe zyhe]; apply: sbeA; rewrite [e%:num]splitr.
+by apply: (le_lt_trans (dist_triangle z _ _)); apply: ltrD.
 Qed.
 
 HB.instance Definition _ := Nbhs_isUniform.Build d M
@@ -155,30 +143,135 @@ HB.instance Definition _ := Nbhs_isUniform.Build d M
   entourageE_subproof nbhsE.
 
 HB.instance Definition _ := Uniform_isPseudoMetric.Build d R M
-  ball_center ball_sym ball_triangle entourageE.
+  dist_ge0 distxx dist_sym dist_triangle entourageE.
 
 HB.end.
 
+HB.factory Record isPseudoMetric (d : filter_display) (R : numFieldType) M &
+    Choice M := {
+  dist : M -> M -> R ;
+  dist_ge0 : forall (x y : M), dist x y >= 0 ;
+  distxx : forall (x : M), dist x x = 0 ;
+  dist_sym : forall (x y : M), dist x y = dist y x ;
+  dist_triangle : forall (y x z : M), dist x z <= dist x y + dist y z
+}.
+HB.builders Context d R M & isPseudoMetric d R M.
+
+Let ent := dist_entourage dist.
+
+HB.instance Definition _ := hasNbhs.Build d M (nbhs_ ent).
+HB.instance Definition _ := Nbhs_isPseudoMetric.Build d R M
+  erefl dist_ge0 distxx dist_sym dist_triangle erefl.
+
+HB.end.
+
+Definition ball {d} {R : numDomainType} {M : pseudoMetricType d R}
+  : M -> R -> set M
+  := fun x e => [set y | dist x y < e].
+Arguments ball {d R M} x e /.
+
+Definition closed_ball {d} {R : numDomainType} {M : pseudoMetricType d R}
+  : M -> R -> set M
+  := fun x e => [set y | dist x y <= e].
+Arguments closed_ball {d R M} x e /.
+
+Section pseudometric_theory.
+Context {d} {R} {M : pseudoMetricType d R}.
+
+Lemma entourage_distE : @entourage _ M = dist_entourage dist.
+Proof. exact: entourageE_subproof. Qed.
+
+Lemma entourage_dist (e : {posnum R}) :
+  entourage [set xy : M * M | dist xy.1 xy.2 < e%:num].
+Proof. by rewrite entourage_distE; exists e%:num => /=. Qed.
+
+Definition dist_nbhs_ (dist : M -> M -> R) (x : M) :=
+  @filter_from R _ [set e | e > 0] (ball x).
+
+Definition dist_nbhs := dist_nbhs_ dist.
+
+Lemma nbhs_distE : @nbhs _ M _ = dist_nbhs.
+Proof.
+rewrite predeq2E => x P; rewrite -nbhs_entourageE entourage_distE; split.
+- move=> [U [_/posnumP[e] dU] UP].
+  exists e%:num => //=; apply: subset_trans UP.
+  by move=> y dxy; apply/xsectionP/dU.
+- move=> [_/posnumP[e] dP].
+  exists [set xy | dist xy.1 xy.2 < e%:num]; first by exists e%:num => /=.
+  by apply: subset_trans dP => ? /xsectionP.
+Qed.
+
+Lemma nbhs_distP x P : nbhs x P <-> dist_nbhs x P.
+Proof. by rewrite nbhs_distE. Qed.
+
+Lemma ballxx (x : M) (e : R) : 0 < e -> ball x e x.
+Proof. by rewrite /= distxx. Qed.
+
+Lemma ball_center (x : M) (e : {posnum R}) :
+  ball x e%:num x.
+Proof. by rewrite /= distxx. Qed.
+
+Lemma nbhsx_ballx (x : M) (eps : R) :
+  0 < eps -> nbhs x (ball x eps).
+Proof. by move=> e0; apply/nbhs_distP; exists eps. Qed.
+
+Lemma open_ball (x : M) (eps : R) :
+  0 < eps -> open (ball x eps).
+Proof.
+rewrite openE => e0 y /= dxy.
+rewrite /interior nbhs_distE.
+exists (eps - dist x y); first by rewrite /= subr_gt0.
+move=> z /= dyz.
+apply: le_lt_trans; first exact: (dist_triangle y).
+apply: (@lt_le_trans _ _ (dist x y + _)).
+  by rewrite ltrD2l; exact: dyz.
+by rewrite addrC subrK.
+Qed.
+
+Lemma open_nbhs_ball (x : M) (eps : R) :
+  0 < eps -> open_nbhs x (ball x eps).
+Proof. by move=> /[dup] /ballxx ? /open_ball ?. Qed.
+
+End pseudometric_theory.
+
+Set Warnings "-deprecated-since-analysis-1.20.0".
+
+#[deprecated(since="analysis 1.20.0", use=dist_entourage)]
+Definition entourage_ {R : numDomainType} {T T'} (ball : T -> R -> set T') :=
+  @filter_from R _ [set x | 0 < x] (fun e => [set xy | ball xy.1 e xy.2]).
+
+#[deprecated(since="analysis 1.20.0", use=dist_entourageE)]
+Lemma entourage_E {R : numDomainType} {T T'} (ball : T -> R -> set T') :
+  entourage_ ball =
+  @filter_from R _ [set x | 0 < x] (fun e => [set xy | ball xy.1 e xy.2]).
+Proof. by []. Qed.
+
+#[deprecated(since="analysis 1.20.0", use=entourage_distE)]
 Lemma entourage_ballE d {R : numDomainType} {M : pseudoMetricType d R} :
   entourage_ (@ball d R M) = entourage.
 Proof. by rewrite entourageE_subproof. Qed.
 
+#[deprecated(since="analysis 1.20.0")]
 Lemma entourage_from_ballE d {R : numDomainType} {M : pseudoMetricType d R} :
   @filter_from R _ [set x : R | 0 < x]
     (fun e => [set xy | @ball d R M xy.1 e xy.2]) = entourage.
 Proof. by rewrite -entourage_ballE. Qed.
 
+#[deprecated(since="analysis 1.20.0", use=entourage_dist)]
 Lemma entourage_ball d {R : numDomainType} (M : pseudoMetricType d R)
   (e : {posnum R}) : entourage [set xy : M * M | ball xy.1 e%:num xy.2].
 Proof. by rewrite -entourage_ballE; exists e%:num => /=. Qed.
 #[global] Hint Resolve entourage_ball : core.
 
+#[deprecated(since="analysis 1.20.0", use=dist_nbhs_)]
 Definition nbhs_ball_ {R : numDomainType} {T T'} (ball : T -> R -> set T')
   (x : T) := @filter_from R _ [set e | e > 0] (ball x).
 
+#[deprecated(since="analysis 1.20.0", use=dist_nbhs)]
 Definition nbhs_ball d {R : numDomainType} {M : pseudoMetricType d R} :=
   nbhs_ball_ (@ball d R M).
 
+#[deprecated(since="analysis 1.20.0", use=nbhs_distE)]
 Lemma nbhs_ballE d {R : numDomainType} {M : pseudoMetricType d R} :
   @nbhs_ball d R M = nbhs.
 Proof.
@@ -189,6 +282,7 @@ rewrite -entourage_ballE; move=> [A [e egt0 sbeA] sAP].
 by exists e => // ? ?; exact/sAP/xsectionP/sbeA.
 Qed.
 
+#[deprecated(since="analysis 1.20.0")]
 Lemma filter_from_ballE {d} {R : numDomainType} {M : pseudoMetricType d R} x :
   @filter_from R _ [set x : R | 0 < x] (@ball d R M x) = nbhs x.
 Proof. by rewrite -nbhs_ballE. Qed.
@@ -201,27 +295,21 @@ Lemma nbhs_ballP {d} {R : numDomainType} {M : pseudoMetricType d R} (x : M) P :
   nbhs x P <-> nbhs_ball x P.
 Proof. by rewrite nbhs_simpl. Qed.
 
-Lemma ball_center d {R : numDomainType} (M : pseudoMetricType d R) (x : M)
-  (e : {posnum R}) : ball x e%:num x.
-Proof. exact: ball_center_subproof. Qed.
 #[global] Hint Extern 0 (ball _ _ _) => solve[apply: ball_center] : core.
 
 Section pseudoMetricType_numDomainType.
 Context {d} {R : numDomainType} {M : pseudoMetricType d R}.
 Implicit Types x y z : M.
 
-Lemma ballxx x (e : R) : 0 < e -> ball x e x.
-Proof. by move=> e_gt0; apply: ball_center (PosNum e_gt0). Qed.
-
 Lemma ball_sym x y (e : R) : ball x e y -> ball y e x.
-Proof. exact: ball_sym_subproof. Qed.
+Proof. by rewrite /= dist_sym. Qed.
 
 Lemma ball_symE x y (e : R) : ball x e y = ball y e x.
-Proof. by rewrite propeqE; split; exact/ball_sym. Qed.
+Proof. by rewrite /= dist_sym. Qed.
 
 Lemma ball_triangle y x z (e1 e2 : R) :
   ball x e1 y -> ball y e2 z -> ball x (e1 + e2) z.
-Proof. exact: ball_triangle_subproof. Qed.
+Proof. by move=> /ltrD /[apply]; apply: le_lt_trans; exact: dist_triangle. Qed.
 
 Lemma nbhsx_ballx x (eps : R) : 0 < eps -> nbhs x (ball x eps).
 Proof. by move=> e0; apply/nbhs_ballP; exists eps. Qed.
