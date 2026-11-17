@@ -3,7 +3,8 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra all_classical.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import interval_inference topology_structure.
+From mathcomp Require Import interval_inference topology_structure
+  separation_axioms.
 From mathcomp Require Import uniform_structure pseudometric_structure compact.
 
 (**md**************************************************************************)
@@ -51,10 +52,7 @@ Qed.
 HB.instance Definition _ := Nbhs_isNbhsTopological.Build _ (T * U)%type
   prod_nbhs_filter prod_nbhs_singleton prod_nbhs_nbhs.
 
-End Prod_Topology.
-
-Lemma fst_open {d1} {U : topologicalType d1} {d2} {V : topologicalType d2}
-    (A : set (U * V)) :
+Lemma fst_open (A : set (T * U)) :
   open A -> open (fst @` A).
 Proof.
 rewrite !openE => oA z [[a b/=] Aab <-]; rewrite /interior.
@@ -62,14 +60,131 @@ have [[P Q] [Pa Qb] pqA] := oA _ Aab; apply: (@filterS _ _ _ P) => // p Pp.
 by exists (p, b) => //=; apply: pqA; split=> //=; exact: nbhs_singleton.
 Qed.
 
-Lemma snd_open {d1} {U : topologicalType d1} {d2} {V : topologicalType d2}
-    (A : set (U * V)) :
+Lemma snd_open (A : set (T * U)) :
   open A -> open (snd @` A).
 Proof.
 rewrite !openE => oA z [[a b/=] Aab <-]; rewrite /interior.
 have [[P Q] [Pa Qb] pqA] := oA _ Aab; apply: (@filterS _ _ _ Q) => // q Qq.
 by exists (a, q) => //=; apply: pqA; split => //; exact: nbhs_singleton.
 Qed.
+
+Lemma openX A B : open A -> open B -> open (A `*` B).
+Proof.
+rewrite (@openE _ (_ * _)%type) /= => oA oB [t u] [/= At Bu].
+by exists (A, B) => //=; split; apply: open_nbhs_nbhs.
+Qed.
+
+Lemma closureX A B : closure (A `*` B) = closure A `*` closure B.
+Proof.
+apply/seteqP; split=> [] [x y] /= => [cAB|[cA cB]]; first split.
+- move=> V Vn.
+  have VXn : nbhs (x, y) (V `*` setT).
+    exists (V, setT) => //=; split=> //; exact: filterT.
+  have := cAB (V `*` setT) VXn.
+  by rewrite -setXI => -[[x' _] [/= ? _]]; exists x'.
+- move=> V Vn.
+  have VXn : nbhs (x, y) (setT `*` V).
+    exists (setT, V) => //=; split=> //; exact: filterT.
+  have := cAB (setT `*` V) VXn.
+  by rewrite -setXI => -[[_ y'] [/= _ ?]]; exists y'.
+- move=> /= V [[A' B'] /= [/cA [x' [? ?]] /cB [y' [? ?]]] ABV].
+  by exists (x', y'); split=> //; apply: ABV.
+Qed.
+
+End Prod_Topology.
+
+Section Prod_Kolmogorov.
+Context {d1} {T : kolmogorovType d1} {d2} {U : kolmogorovType d2}.
+
+Let prod_kolmogorovP : kolmogorov_space (T * U)%type.
+Proof.
+move=> [x y] [x' y'].
+rewrite xpair_eqE negb_and => /orP[/kolmogorovP[A hA]|/kolmogorovP[B hB]].
+- exists (A `*` setT) => /=; rewrite !andB.
+  case: hA => [] [An nA]; [left|right]; split=> //.
+  + by exists (A, setT) => //=; split=> //; exact: filterT.
+  + by exists (A, setT) => //=; split=> //; exact: filterT.
+- exists (setT `*` B) => /=; rewrite !andB.
+  case: hB => [] [Bn nB]; [left|right]; split=> //.
+  + by exists (setT, B) => //=; split=> //; exact: filterT.
+  + by exists (setT, B) => //=; split=> //; exact: filterT.
+Qed.
+
+HB.instance Definition _ :=
+  Topological_isKolmogorov.Build _ (T * U)%type prod_kolmogorovP.
+
+End Prod_Kolmogorov.
+
+Section Prod_Accessible.
+Context {d1} {T : accessibleType d1} {d2} {U : accessibleType d2}.
+
+Let prod_accessibleP : accessible_space (T * U)%type.
+Proof.
+move=> [x y] [x' y']; rewrite xpair_eqE negb_and.
+case/orP => [/accessibleP[A [oA Ax nAx']]|/accessibleP[B [oB By nBy']]].
+- exists (A `*` setT) => /=; rewrite !andB; split=> //.
+  by apply: openX => //; exact: openT.
+- exists (setT `*` B) => /=; rewrite !andB; split=> //.
+  by apply: openX => //; exact: openT.
+Qed.
+
+HB.instance Definition _ :=
+  Topological_isAccessible.Build _ (T * U)%type prod_accessibleP.
+
+End Prod_Accessible.
+
+Section Prod_Hausdorff.
+Context {d1} {T : hausdorffType d1} {d2} {U : hausdorffType d2}.
+
+Let prod_hausdorffP : hausdorff_space (T * U)%type.
+Proof.
+move=> [x y] [x' y']; rewrite xpair_eqE negb_and.
+case/orP => [/hausdorffP[A [B [An Bn dAB]]]|/hausdorffP[A [B [An Bn dAB]]]].
+- exists (A `*` setT), (B `*` setT); split.
+  + by exists (A, setT) => //=; split=> //; exact: filterT.
+  + by exists (B, setT) => //=; split=> //; exact: filterT.
+  + by rewrite inE -setXI setIT (disj_set2P dAB) set0X.
+- exists (setT `*` A), (setT `*` B); split.
+  + by exists (setT, A) => //=; split=> //; exact: filterT.
+  + by exists (setT, B) => //=; split=> //; exact: filterT.
+  + by rewrite inE -setXI setIT (disj_set2P dAB) setX0.
+Qed.
+
+HB.instance Definition _ :=
+  Topological_isHausdorff.Build _ (T * U)%type prod_hausdorffP.
+
+End Prod_Hausdorff.
+
+Section Prod_Regular.
+Context {d1} {T : regularType d1} {d2} {U : regularType d2}.
+
+Let prod_regularP : regular_space (T * U)%type.
+Proof.
+apply/closure_regularP => -[x y] V. 
+case/open_nbhs_nbhs => [[A B] /= [An Bn ABV]].
+have [|A' [oA' Ax'] cAA] := closure_regularP.1 (regularP T) x A°.
+  by split=> //; exact: open_interior.
+have [|B' [oB' By'] cBB] := closure_regularP.1 (regularP U) y B°.
+  by split=> //; exact: open_interior.
+exists (A' `*` B'); first by split=> //; apply: openX.
+rewrite closureX.
+apply: subset_trans ABV; apply: setSX.
+- by apply: (subset_trans cBB); exact: interior_subset.
+- by apply: (subset_trans cAA); exact: interior_subset.
+Qed.
+
+HB.instance Definition _ :=
+  Topological_isRegular.Build _ (T * U)%type prod_regularP.
+
+End Prod_Regular.
+
+Section Prod_RegularHausdorff.
+Context {d1} {T : regularHausdorffType d1} {d2} {U : regularHausdorffType d2}.
+
+HB.instance Definition _ := Topological_isRegularHausdorff.Build _ (T * U)%type
+  (regularP _) (kolmogorovP _).
+
+End Prod_RegularHausdorff.
 
 (**md Product of two uniform spaces: *)
 Section prod_Uniform.

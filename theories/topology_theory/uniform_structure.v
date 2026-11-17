@@ -3,7 +3,7 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra all_classical.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import topology_structure.
+From mathcomp Require Import topology_structure compact separation_axioms.
 
 (**md**************************************************************************)
 (* # Uniform Spaces                                                           *)
@@ -60,7 +60,7 @@ Proof. by []. Qed.
 
 Local Open Scope relation_scope.
 
-HB.mixin Record Nbhs_isUniform_mixin d M & Nbhs d M := {
+HB.mixin Record Regular_isUniform d M & Nbhs d M := {
   entourage : set_system (M * M);
   entourage_filter : Filter entourage;
   entourage_diagonal_subproof :
@@ -73,18 +73,53 @@ HB.mixin Record Nbhs_isUniform_mixin d M & Nbhs d M := {
 
 #[short(type="uniformType")]
 HB.structure Definition Uniform d :=
-  {T of Topological d T & Nbhs_isUniform_mixin d T}.
+  { T of Regular d T & Regular_isUniform d T }.
 
 #[short(type="puniformType")]
 HB.structure Definition PointedUniform d :=
-  {T of PointedTopological d T & Nbhs_isUniform_mixin d T}.
+  { T of Pointed T & Uniform d T }.
+
+HB.structure Definition UniformHausdorff d :=
+  { T of Uniform d T & Hausdorff d T }.
 
 HB.instance Definition _ d' d (T : uniformType d) :=
-  Nbhs_isUniform_mixin.Build d' (with_fdisp d' T)
+  Regular_isUniform.Build d' (with_fdisp d' T)
     entourage_filter entourage_diagonal_subproof entourage_inv_subproof
     entourage_split_ex_subproof nbhsE_subproof.
 HB.instance Definition _ d' d (T : puniformType d) :=
   PointedUniform.on (with_fdisp d' T).
+
+HB.factory Record Topological_isUniform d M & Topological d M := {
+  entourage : set_system (M * M);
+  entourage_filter : Filter entourage;
+  entourage_diagonal : forall A, entourage A -> diagonal `<=` A;
+  entourage_inv : forall A, entourage A -> entourage A^-1;
+  entourage_split_ex :
+    forall A, entourage A -> exists2 B, entourage B & B \; B `<=` A;
+  nbhsE : nbhs = nbhs_ entourage;
+}.
+HB.builders Context d M & Topological_isUniform d M.
+
+Let regularP : regular_space M.
+Proof.
+move=> F x cF nFx.
+have : nbhs x (~` F).
+  apply: open_nbhs_nbhs; split=> //.
+  by apply: closed_openC.
+rewrite {1}nbhsE => -[U /[dup] eU /entourage_split_ex[V eV VU] xUF].
+exists (xsection V x), (\bigcup_(y in F) ysection V y); split.
+- by rewrite nbhsE; exists V.
+- by move=> y Fy; rewrite nbhsE; exists V^-1
+    ; [exact: entourage_inv|exact: bigcup_sup].
+apply/disj_setPS => z [/xsectionP Vxz [y Fy /ysectionP Vzy]].
+by apply: (xUF y) => //; apply/xsectionP/VU; exists z.
+Qed.
+
+HB.instance Definition _ := Topological_isRegular.Build d M regularP.
+HB.instance Definition _ := Regular_isUniform.Build d M
+  entourage_filter entourage_diagonal entourage_inv entourage_split_ex nbhsE.
+
+HB.end.
 
 HB.factory Record Nbhs_isUniform d M & Nbhs d M := {
   entourage : set_system (M * M);
@@ -127,12 +162,17 @@ Qed.
 HB.instance Definition _ := Nbhs_isNbhsTopological.Build d M
   nbhs_filter nbhs_singleton nbhs_nbhs.
 
-HB.instance Definition _ := Nbhs_isUniform_mixin.Build d M
+HB.instance Definition _ := Topological_isUniform.Build d M
   entourage_filter entourage_diagonal entourage_inv entourage_split_ex nbhsE.
 
 HB.end.
 
 Local Open Scope relation_scope.
+
+Module Nbhs_isUniform_mixin.
+#[deprecated(since="analysis 1.20.0", use=Topological_isUniform.Build)]
+Notation Build d M := (Topological_isUniform.Build d M).
+End Nbhs_isUniform_mixin.
 
 HB.factory Record isUniform (d : filter_display) M & Choice M := {
   entourage : set_system (M * M);
@@ -155,7 +195,7 @@ HB.instance Definition _ := @Nbhs_isUniform.Build d M entourage
 HB.end.
 
 Lemma nbhs_entourageE {d} {M : uniformType d} : nbhs_ (@entourage d M) = nbhs.
-Proof. by rewrite -Nbhs_isUniform_mixin.nbhsE_subproof. Qed.
+Proof. by rewrite -Regular_isUniform.nbhsE_subproof. Qed.
 
 Lemma entourage_sym {X Y : Type} E (x : X) (y : Y) :
   E (x, y) <-> (E ^-1)%relation (y, x).
@@ -376,6 +416,19 @@ exists (xsection (B^-1%relation) (lim F), xsection B (lim F)).
 move=> ab [/= /xsectionP Balima /xsectionP Blimb]; apply: sB2A.
 by exists (lim F).
 Qed.
+
+Lemma compact_cauchy_cvg {d} {T : puniformType d}
+  (U : set T) (F : set_system T) :
+  ProperFilter F -> cauchy F -> F U -> compact U -> cvg F.
+Proof.
+move=> PF cf FU /(_ F PF FU) [x [_ clFx]]; apply: (cvgP x).
+apply/cvg_entourageP => E entE.
+have : nbhs entourage (split_ent E) by rewrite nbhs_filterE.
+move=> /(cf (split_ent E))[] [D1 D2]/= /[!nbhs_simpl] -[FD1 FD2 D1D2E].
+have : nbhs x (xsection (split_ent E) x) by exact: nbhs_entourage.
+move=> /(clFx _ (xsection (split_ent E) x) FD1)[z [Dz /xsectionP Exz]].
+by near=> t; apply/(entourage_split z entE Exz)/D1D2E; split => //; near: t.
+Unshelve. all: by end_near. Qed.
 
 HB.mixin Record Uniform_isComplete d T & PointedUniform d T := {
   cauchy_cvg :

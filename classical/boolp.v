@@ -210,6 +210,16 @@ Lemma choice X Y (P : X -> Y -> Prop) :
   (forall x, exists y, P x y) -> {f & forall x, P x (f x)}.
 Proof. by move=> /(_ _)/constructive_indefinite_description -/all_tag. Qed.
 
+Lemma pair_choice X Y Z (P : X -> Y -> Z -> Prop) :
+  (forall x, exists y z, P x y z) -> {f & {g & forall x, P x (f x) (g x)}}.
+Proof.
+move=> hyz.
+suff [fg hfg] : {fg : X -> Y * Z & forall x, P x (fg x).1 (fg x).2}.
+  by exists (fst \o fg), (snd \o fg) => x /=.
+apply: (@choice _ _ (fun x fgx => P x fgx.1 fgx.2)) => x.
+by case: (hyz x) => [y [z Pyz]]; exists (y, z).
+Qed.
+
 (* Diaconescu Theorem *)
 Theorem EM P : P \/ ~ P.
 Proof.
@@ -264,6 +274,25 @@ Proof. by rewrite propeqE; split. Qed.
 
 Lemma propF (P : Prop) : ~ P -> P = False.
 Proof. by move=> p; rewrite propeqE; tauto. Qed.
+
+Lemma xcond_choice X Y (y0 : Y) (Q : X -> Prop) (P : X -> Y -> Prop) :
+  (forall x, Q x -> exists y, P x y) -> {f & forall x, Q x -> P x (f x)}.
+Proof.
+move=> hex; apply: (@choice _ _ (fun x fx => Q x -> P x fx)) => x.
+case: (EM (Q x)) => [/hex[y Pxy]|]; last by exists y0.
+by exists y.
+Qed.
+
+Lemma xcond_pair_choice X Y Z (y0 : Y) (z0 : Z)
+    (Q : X -> Prop) (P : X -> Y -> Z -> Prop) :
+  (forall x, Q x -> exists y z, P x y z) ->
+  {f & {g & forall x, Q x -> P x (f x) (g x)}}.
+Proof.
+move=> hyz.
+apply: (@pair_choice _ _ _ (fun x fx gx => Q x -> P x fx gx)) => x.
+case: (EM (Q x)) => [/hyz[y [z Pxyz]]|]; last by exists y0, z0.
+by exists y, z.
+Qed.
 
 Lemma eq_fun T rT (U V : T -> rT) :
   (forall x : T, U x = V x) -> (fun x => U x) = (fun x => V x).

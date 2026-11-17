@@ -1,8 +1,9 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
 From mathcomp Require Import boot order algebra all_classical all_reals.
-From mathcomp Require Import topology_structure uniform_structure.
-From mathcomp Require Import order_topology pseudometric_structure compact.
+From mathcomp Require Import topology_structure separation_axioms.
+From mathcomp Require Import uniform_structure order_topology
+  pseudometric_structure compact.
 
 (**md**************************************************************************)
 (* # Discrete Topology                                                        *)
@@ -65,7 +66,7 @@ HB.mixin Record Discrete_ofPseudometric d {R : numDomainType} T &
 
 #[short(type="discreteTopologicalType")]
 HB.structure Definition DiscreteTopology d :=
-  { T of DiscreteNbhs d T & Topological d T}.
+  { T of DiscreteNbhs d T & RegularHausdorff d T}.
 
 #[short(type="discreteOrderTopologicalType")]
 HB.structure Definition DiscreteOrderTopology td od :=
@@ -81,7 +82,7 @@ HB.structure Definition PointedDiscreteOrderTopology td od :=
 
 #[short(type="discreteUniformType")]
 HB.structure Definition DiscreteUniform d :=
-  { T of Discrete_ofUniform d T & Uniform d T & Discrete_ofNbhs d T}.
+  { T of Discrete_ofUniform d T & Uniform d T & DiscreteTopology d T}.
 
 #[short(type="discretePseudoMetricType")]
 HB.structure Definition DiscretePseudoMetric {R : numDomainType} d :=

@@ -57,7 +57,7 @@ Definition cantor_like d (T : topologicalType d) :=
   [/\ perfect_set [set: T],
       compact [set: T],
       hausdorff_space T &
-      zero_dimensional T].
+      totally_separated T].
 
 Lemma cantor_space_compact : compact [set: cantor_space].
 Proof.
@@ -70,7 +70,7 @@ Proof.
 apply: hausdorff_product => ?; apply: discrete_hausdorff.
 Qed.
 
-Lemma cantor_zero_dimensional : zero_dimensional cantor_space.
+Lemma cantor_totally_separated : totally_separated cantor_space.
 Proof.
 apply: zero_dimension_prod => _; apply: discrete_zero_dimension.
 Qed.
@@ -84,7 +84,7 @@ split.
 - exact: cantor_perfect.
 - exact: cantor_space_compact.
 - exact: cantor_space_hausdorff.
-- exact: cantor_zero_dimensional.
+- exact: cantor_totally_separated.
 Qed.
 
 
@@ -263,7 +263,7 @@ Section TreeStructure.
 Context {d} {R : realType} {T : pseudoPMetricType d R}.
 Hypothesis cantorT : cantor_like T.
 
-Let dsctT : zero_dimensional T.   Proof. by case: cantorT. Qed.
+Let dsctT : totally_separated T.   Proof. by case: cantorT. Qed.
 Let pftT  : perfect_set [set: T]. Proof. by case: cantorT. Qed.
 Let cmptT : compact [set: T].     Proof. by case: cantorT. Qed.
 Let hsdfT : hausdorff_space T.   Proof. by case: cantorT. Qed.

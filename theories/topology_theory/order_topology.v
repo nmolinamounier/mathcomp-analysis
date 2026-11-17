@@ -3,8 +3,9 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra finmap all_classical.
 #[warning="-warn-library-file-internal-analysis"]
 From mathcomp Require Import unstable.
-From mathcomp Require Import topology_structure uniform_structure.
-From mathcomp Require Import product_topology pseudometric_structure.
+From mathcomp Require Import topology_structure separation_axioms.
+From mathcomp Require Import product_topology uniform_structure
+  pseudometric_structure.
 
 (**md**************************************************************************)
 (* # Order topology                                                           *)
@@ -50,8 +51,11 @@ HB.structure Definition POrderedNbhs td od :=
 HB.structure Definition POrderedTopological td od :=
   { T of Topological td T & Order.isPOrder od T }.
 
+HB.structure Definition POrderedRegular td od :=
+  { T of Regular td T & Order.isPOrder od T }.
+
 HB.structure Definition POrderedUniform td od :=
-  {T of Uniform td T & Order.isPOrder od T}.
+  { T of Uniform td T & Order.isPOrder od T }.
 
 HB.structure Definition POrderedPseudoMetric td od (R : numDomainType) :=
   {T of PseudoMetric td R T & Order.isPOrder od T}.
@@ -74,7 +78,8 @@ HB.structure Definition OrderNbhs td od :=
 
 #[short(type="orderTopologicalType")]
 HB.structure Definition OrderTopological td od :=
-  { T of Topological td T & Order.Total od T & Order_isNbhs td od T }.
+  { T of Hausdorff td T & Regular td T & Order.Total od T &
+    Order_isNbhs td od T }.
 
 #[short(type="orderUniformType")]
 HB.structure Definition OrderUniform td od :=
@@ -83,6 +88,148 @@ HB.structure Definition OrderUniform td od :=
 #[short(type="orderPseudoMetricType")]
 HB.structure Definition OrderPseudoMetric td od (R : numDomainType) :=
   {T of PseudoMetric td R T & OrderTopological td od T}.
+
+HB.factory Record Order_isTopological td od T
+    & Topological td T & Order.Total od T := {
+  itv_nbhsE : forall x : T, nbhs x = filter_from
+    (fun i => itv_open_ends i /\ x \in i)
+    (fun i => [set` i])
+}.
+
+HB.builders Context td od T & Order_isTopological td od T.
+
+Local Open Scope order_scope.
+Local Open Scope classical_set_scope.
+
+Let order_hausdorffP : hausdorff_space T.
+Proof.
+move=> x y xy.
+wlog xy : x y {xy} / x < y.
+  move: xy => + hlt; rewrite neq_lt => /orP[xy|yx]; first by apply: hlt.
+  have [B [A [Bn An]]] := hlt _ _ yx; rewrite disj_set_sym => dAB.
+  by exists A, B.
+case: (EM (exists2 z, x < z & z < y)) => [[/= z xz zy]|].
+  exists `]-oo,z[, `]z,+oo[; split.
+  - by rewrite itv_nbhsE /=; exists `]-oo,z[%O.
+  - rewrite itv_nbhsE /=; exists `]z,+oo[%O => //; split=> //.
+    by rewrite in_itv/= zy.
+  - rewrite !set_itvE. 
+    by apply/disj_setPLR => ? /lt_trans /[apply]; rewrite ltxx.
+move/forallPNP => /= hgap.
+exists `]-oo,y[, `]x,+oo[; split.
+- by rewrite itv_nbhsE /=; exists `]-oo,y[%O.
+- rewrite itv_nbhsE /=; exists `]x,+oo[%O => //; split=> //.
+  by rewrite in_itv/= xy.
+- by rewrite !set_itvE; apply/disj_setPLR => ? /= + /hgap.
+Qed.
+
+HB.instance Definition _ := Topological_isHausdorff.Build td T order_hausdorffP.
+
+Let itv_basis : basis [set [set` i] | i in [set` @itv_open_ends _ T]].
+Proof.
+split.
+  move=> _ [i iop <-]; rewrite openE => x /= xi.
+  by rewrite /interior itv_nbhsE /=; exists i.
+move=> /= x A; rewrite itv_nbhsE => -[/= i [iop xi siA]].
+by exists [set` i] => //=; split=> //; exists i.
+Qed.
+
+Let open_ends_itv (i : interval T) :
+  itv_open_ends i -> open [set` i].
+Proof. by move=> oi; apply itv_basis; exists i. Qed.
+
+Let open_itv (x y : T) : open `]x, y[.
+Proof. exact: open_ends_itv. Qed.
+
+Let open_rray (x : T) : open `]x, +oo[.
+Proof. exact: open_ends_itv. Qed.
+
+Let open_lray (x : T) : open `]-oo, x[.
+Proof. exact: open_ends_itv. Qed.
+
+Let closed_itv (x y : T) : closed `[x, y].
+Proof. by rewrite -openC setCitv /=; apply: openU. Qed.
+
+Let itv_closure (x y : T) (b b' : bool) :
+  closure [set` Interval (BSide b x) (BSide b' y)] `<=` `[x, y].
+Proof.
+rewrite closureE => r; apply; split=> //.
+by apply: subset_itvScc => /=; rewrite bnd_simp.
+Qed.
+
+Let closed_rray (x : T) : closed `[x, +oo[.
+Proof. by rewrite -openC setCitvr. Qed.
+
+Let closed_lray (x : T) : closed `]-oo, x].
+Proof. by rewrite -openC setCitvl. Qed.
+
+Let order_regularP : regular_space T.
+Proof.
+apply/closure_regularP => x U /[dup] -[oU Ux].
+move/open_nbhs_nbhs; rewrite itv_nbhsE /=.
+case=> [[a b] [op_ab xab] abU].
+pose Il := [set` Interval a b] `&` [set y | y < x].
+pose Ir := [set` Interval a b] `&` [set y | x < y].
+case: (EM (Il !=set0)) (EM (Ir !=set0)) => /= [[u Ilu]|Il0] [[v Irv]|Ir0].
+- case: Ilu Irv => [/= ui ux] [/= vi xv].
+  exists `]u, v[.
+    by split=> //=; rewrite in_itv /= ux xv.
+  apply: subset_trans abU.
+  apply: subset_trans; first exact: itv_closure.
+  by move: ui vi => /andP[au _] /andP[_ vb]; apply: subset_itv.
+- case: Ilu Ir0 => [/= uab ux] /nonemptyPn; rewrite -subset0 => Ir0.
+  pose I := [set` Interval a b] `&` `]u,+oo[.
+  have oI : open I by apply: openI => //; apply: open_ends_itv.
+  exists I.
+    by split=> //; rewrite /I set_itvE /=.
+  have -> : I = `]u, x].
+    rewrite /I !set_itvE; apply/seteqP; split=> z /=.
+    + move=> [zi -> /=]; rewrite leNgt; apply/negP => xz.
+      by apply: (Ir0 z).
+    + move=> /andP[/[dup] uz -> zx]; split=> //.
+      move: xab uab => /andP[_ xb] /andP[ua _].
+      apply/andP; split.
+      * by apply: (le_trans ua); rewrite bnd_simp ltW.
+      * by apply: le_trans xb.
+  apply: subset_trans; first exact: itv_closure.
+  apply: subset_trans abU.
+  by move: uab xab => /andP[au _] /andP[_ xb]; apply: subset_itv.
+- case: Irv Il0 => [/= vab xv] /nonemptyPn; rewrite -subset0 => Il0.
+  pose I := [set` Interval a b] `&` `]-oo,v[.
+  have oI : open I by apply: openI => //; apply: open_ends_itv.
+  exists I.
+    by split=> //; rewrite /I set_itvE /=.
+  have -> : I = `[x, v[.
+    rewrite /I !set_itvE; apply/seteqP; split=> z /=.
+    + move=> [zi ->]; rewrite andbT leNgt; apply/negP => zx.
+      by apply: (Il0 z).
+    + move=> /andP[xz /[dup] zv ->]; split=> //.
+      move: xab vab => /andP[ax _] /andP[_ vb].
+      apply/andP; split.
+      * by apply: (le_trans ax).
+      * by apply: le_trans vb; rewrite bnd_simp ltW.
+  apply: subset_trans; first exact: itv_closure.
+  apply: subset_trans abU.
+  by move: xab vab => /andP[ax _] /andP[_ vb]; apply: subset_itv.
+- suff ox : open [set x].
+    exists [set x] => //.
+    rewrite -(closure_id _).1; first exact: closed_set1.
+    by rewrite sub1set inE.
+  suff <- : [set` Interval a b] = [set x].
+    by apply: open_ends_itv.
+  apply/seteqP; split; last by rewrite sub1set inE.
+  move=> /= y yab; apply: contrapT => /eqP.
+  rewrite neq_lt => /orP[yx|xy].
+  + by apply: Il0; exists y.
+  + by apply: Ir0; exists y.
+Qed.
+
+HB.instance Definition _ :=
+  Topological_isRegular.Build td T order_regularP.
+HB.instance Definition _ :=
+  Order_isNbhs.Build td od T itv_nbhsE.
+
+HB.end.
 
 Section order_topologies.
 Local Open Scope order_scope.
@@ -262,7 +409,7 @@ exists j; first split.
   by move=> ? ? ? ? <- <-; rewrite itv_setI.
 Qed.
 
-HB.instance Definition _ := Order_isNbhs.Build _ _ oT order_nbhs_itv.
+HB.instance Definition _ := Order_isTopological.Build _ _ oT order_nbhs_itv.
 End induced_order_topology.
 
 Lemma min_continuous {td od} {T : orderTopologicalType td od} :

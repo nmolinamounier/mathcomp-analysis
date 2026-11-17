@@ -244,3 +244,25 @@ End connected_sets.
 
 Arguments connected {d T}.
 Arguments connected_component {d T}.
+
+Section totally_disconnected.
+Context {d} {T : topologicalType d}.
+
+Definition totally_disconnected (A : set T) := forall x, A x ->
+  connected_component A x = [set x].
+
+Definition totally_separated := forall x y, x != y ->
+  exists U : set T, [/\ clopen U, U x & ~ U y].
+
+Lemma totally_separated_totally_disconnected :
+  totally_separated -> totally_disconnected [set: T].
+Proof.
+move=> zdA x _; rewrite eqEsubset.
+split=> [z [R [Rx _ ctdR Rz]]|_ ->]; last exact: connected_component_refl.
+apply: contrapT => /eqP znx; have [U [[oU cU] Uz Ux]] := zdA _ _  znx.
+suff : R `&` U = R by move: Rx => /[swap] <- [].
+by apply: ctdR; [exists z|exists U|exists U].
+Qed.
+
+End totally_disconnected.
+Arguments totally_separated {d} T.

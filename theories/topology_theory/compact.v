@@ -3,7 +3,6 @@ From HB Require Import structures.
 From mathcomp Require Import boot order algebra finmap.
 From mathcomp Require Import all_classical.
 From mathcomp Require Import interval_inference reals topology_structure.
-From mathcomp Require Import uniform_structure pseudometric_structure.
 
 (**md**************************************************************************)
 (* # Compactness                                                              *)
@@ -321,18 +320,13 @@ Definition closed_fam_of (A : set T) I (D : set I) (f : I -> set T) :=
   exists2 g : I -> set T, (forall i, D i -> closed (g i)) &
     forall i, D i -> f i = A `&` g i.
 
-End Covers.
-
-Section PCovers.
-Context {d} {T : ptopologicalType d}.
-
 Lemma compact_In0 :
   compact = [set A | forall (I : choiceType) (D : set I) (f : I -> set T),
     closed_fam_of A D f -> finI D f -> \bigcap_(i in D) f i !=set0].
 Proof.
 rewrite predeqE => A; split=> [Aco I D f [g gcl feAg] finIf|Aco F FF FA].
-  case: (pselect (exists i, D i)) => [[i Di] | /asboolP]; last first.
-    by rewrite asbool_neg => /forallp_asboolPn D0; exists point => ? /D0.
+  case: (pselect (exists i, D i)) => [[i Di] | /forallNP D0]; last first.
+    by have [//|x _] := finIf fset0; exists x => ? /D0.
   have [|p [Ap clfinIfp]] := Aco _ (finI_filter finIf).
     by exists (f i); [exact: open_finI_from1|rewrite feAg // => ? []].
   exists p => j Dj; rewrite feAg //; split=> //; apply: gcl => // B.
@@ -347,7 +341,7 @@ exists p; split=> [|B C FB p_C]; first by have /AclFIp [] := FA.
 by have /AclFIp [_] := FB; move=> /(_ _ p_C).
 Qed.
 
-Lemma compact_cover : compact = @cover_compact d T.
+Lemma compact_cover : compact = cover_compact.
 Proof.
 rewrite compact_In0 cover_compactE predeqE => A.
 split=> [Aco I D f [g gop feAg] fcov|Aco I D f [g gcl feAg]].
@@ -368,8 +362,8 @@ split=> [Aco I D f [g gop feAg] fcov|Aco I D f [g gcl feAg]].
   rewrite asbool_neg => /existsp_asboolPn [p /asboolP].
   rewrite asbool_neg => /imply_asboolPn [Ap nUfp].
   by exists p => i D'i; split=> // fip; apply: nUfp; exists i.
-case: (pselect (exists i, D i)) => [[j Dj] | /asboolP]; last first.
-  by rewrite asbool_neg => /forallp_asboolPn D0 => _; exists point => ? /D0.
+case: (pselect (exists i, D i)) => [[j Dj] | /forallNP D0]; last first.
+  by case/(_ fset0) => // x _; exists x => ? /D0.
 apply: contraPP => /asboolP; rewrite asbool_neg => /forallp_asboolPn If0.
 apply/asboolP; rewrite asbool_neg; apply/existsp_asboolPn.
 have Anfcov : A `<=` \bigcup_(i in D) (A `\` f i).
@@ -392,7 +386,7 @@ have /Ifp := D'k; rewrite feAg; first by have /sD := D'k; rewrite inE.
 by move=> [/sAnfcov [i D'i [_ nfip]] _]; have /Ifp := D'i.
 Qed.
 
-End PCovers.
+End Covers.
 
 Lemma finite_compact {d} {X : topologicalType d} (A : set X) :
   finite_set A -> compact A.
@@ -402,7 +396,7 @@ case/finite_setP=> n; elim: n A => [A|n ih A /eq_cardSP[x Ax /ih ?]].
 by rewrite -(setD1K Ax); apply: compactU => //; exact: compact_set1.
 Qed.
 
-Lemma clopen_countable {d} {T : ptopologicalType d}:
+Lemma clopen_countable {d} {T : topologicalType d}:
   compact [set: T] -> @second_countable d T -> countable (@clopen d T).
 Proof.
 move=> cmpT [B /fset_subset_countable cntB] [obase Bbase].
@@ -429,52 +423,4 @@ rewrite eqEsubset; split => z.
   by have [] := projT2 (cid (h x)) Dx.
 move=> /DsubC /= [y /= yfs hyz]; exists (h' y) => //.
 by rewrite set_imfset /=; exists y.
-Qed.
-
-Lemma compact_cauchy_cvg {d} {T : puniformType d}
-  (U : set T) (F : set_system T) :
-  ProperFilter F -> cauchy F -> F U -> compact U -> cvg F.
-Proof.
-move=> PF cf FU /(_ F PF FU) [x [_ clFx]]; apply: (cvgP x).
-apply/cvg_entourageP => E entE.
-have : nbhs entourage (split_ent E) by rewrite nbhs_filterE.
-move=> /(cf (split_ent E))[] [D1 D2]/= /[!nbhs_simpl] -[FD1 FD2 D1D2E].
-have : nbhs x (xsection (split_ent E) x) by exact: nbhs_entourage.
-move=> /(clFx _ (xsection (split_ent E) x) FD1)[z [Dz /xsectionP Exz]].
-by near=> t; apply/(entourage_split z entE Exz)/D1D2E; split => //; near: t.
-Unshelve. all: by end_near. Qed.
-
-Lemma compact_second_countable {d} {R : realType} {T : pseudoPMetricType d R} :
-  compact [set: T] -> @second_countable d T.
-Proof.
-have npos n : (0:R) < n.+1%:R^-1 by [].
-pose f n (z : T): set T := (ball z (PosNum (npos n))%:num)°.
-move=> cmpt; have h n : finite_subset_cover [set: T] (f n) [set: T].
-  move: cmpt; rewrite compact_cover; apply.
-  - by move=> z _; rewrite /f; exact: open_interior.
-  - by move=> z _; exists z => //; rewrite /f /interior; exact: nbhsx_ballx.
-pose h' n := cid (iffLR (exists2P _ _) (h n)).
-pose h'' n := projT1 (h' n).
-pose B := \bigcup_n (f n) @` [set` h'' n]; exists B;[|split].
-- apply: bigcup_countable => // n _; apply: finite_set_countable.
-  exact/finite_image/ finite_fset.
-- by move => ? [? _ [? _ <-]]; exact: open_interior.
-- move=> x V /nbhs_ballP [] _/posnumP[eps] ballsubV.
-  have [//|N] := @ltr_add_invr R 0%R (eps%:num/2) _; rewrite add0r => deleps.
-  have [w wh fx] : exists2 w : T, w \in h'' N & f N w x.
-    by have [_ /(_ x) [// | w ? ?]] := projT2 (h' N); exists w.
-  exists (f N w); first split => //; first (by exists N).
-  apply: (subset_trans _ ballsubV) => z bz.
-  rewrite [_%:num]splitr; apply: (@ball_triangle _ _ _ w).
-    by apply: (le_ball (ltW deleps)); apply/ball_sym; apply: interior_subset.
-  by apply: (le_ball (ltW deleps)); apply: interior_subset.
-Qed.
-
-Lemma clopen_surj {d} {R : realType} {T : pseudoPMetricType d R} :
-  compact [set: T] -> $|{surjfun [set: nat] >-> @clopen d T}|.
-Proof.
-move=> cmptT.
-suff : @clopen _ T = set0 \/ $|{surjfun [set: nat] >-> @clopen _ T}|.
-  by case => //; rewrite eqEsubset => -[/(_ _ clopenT)].
-exact/pfcard_geP/clopen_countable/compact_second_countable.
 Qed.

@@ -1,8 +1,9 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
-From mathcomp Require Import boot order algebra archimedean all_classical.
+From mathcomp Require Import boot order algebra archimedean.
+From mathcomp Require Import all_classical finmap.
 From mathcomp Require Import interval_inference reals topology_structure.
-From mathcomp Require Import uniform_structure.
+From mathcomp Require Import uniform_structure compact separation_axioms.
 
 (**md**************************************************************************)
 (* # PseudoMetric Spaces                                                      *)
@@ -97,7 +98,7 @@ HB.instance Definition _ d' d R (T : pseudoPMetricType d R) :=
   PseudoPointedMetric.on (with_fdisp d' T).
 
 (* was uniformityOfBallMixin *)
-HB.factory Record Nbhs_isPseudoMetric d (R : numFieldType) M & Nbhs d M := {
+HB.factory Record Nbhs_isPseudoMetric d (R : archiNumFieldType) M & Nbhs d M := {
   ent : set_system (M * M);
   nbhsE : nbhs = nbhs_ ent;
   ball : M -> R -> M -> Prop ;
@@ -111,21 +112,17 @@ HB.factory Record Nbhs_isPseudoMetric d (R : numFieldType) M & Nbhs d M := {
 HB.builders Context d R M & Nbhs_isPseudoMetric d R M.
 Local Open Scope relation_scope.
 
-Let ball_le x : {homo ball x : e1 e2 / e1 <= e2 >-> e1 `<=` e2}.
+Let le_ball x (e1 e2 : R) : e1 <= e2 -> ball x e1 `<=` ball x e2.
 Proof.
-move=> e1 e2 le12 y xe1_y.
-move: le12; rewrite le_eqVlt => /orP [/eqP <- //|].
-rewrite -subr_gt0 => lt12.
-rewrite -[e2](subrK e1); apply: ball_triangle xe1_y.
-suff : ball x (PosNum lt12)%:num x by [].
-exact: ball_center.
+move=> le12 y; case: comparableP le12 => [lte12 _|//|//|->//].
+by rewrite -[e2](subrK e1); apply/ball_triangle/ball_center; rewrite subr_gt0.
 Qed.
 
 Let entourage_filter_subproof : Filter ent.
 Proof.
 rewrite entourageE; apply: filter_from_filter; first by exists 1 => /=.
 move=> _ _ /posnumP[e1] /posnumP[e2]; exists (Num.min e1 e2)%:num => //=.
-by rewrite subsetI; split=> ?; apply: ball_le;
+by rewrite subsetI; split=> ?; apply: le_ball;
    rewrite num_le// ge_min lexx ?orbT.
 Qed.
 
@@ -359,6 +356,41 @@ Proof.
 rewrite -(withinET (F := nbhs p)) cvg_withinP withinET.
 apply/propeqP; apply: eq_forall => u; congr (_ -> _).
 by apply/propeqP; split=> [[]|].
+Qed.
+
+Lemma compact_second_countable {d} {R : realType} {T : pseudoPMetricType d R} :
+  compact [set: T] -> @second_countable d T.
+Proof.
+have npos n : (0:R) < n.+1%:R^-1 by [].
+pose f n (z : T): set T := (ball z (PosNum (npos n))%:num)°.
+move=> cmpt; have h n : finite_subset_cover [set: T] (f n) [set: T].
+  move: cmpt; rewrite compact_cover; apply.
+  - by move=> z _; rewrite /f; exact: open_interior.
+  - by move=> z _; exists z => //; rewrite /f /interior; exact: nbhsx_ballx.
+pose h' n := cid (iffLR (exists2P _ _) (h n)).
+pose h'' n := projT1 (h' n).
+pose B := \bigcup_n (f n) @` [set` h'' n]; exists B;[|split].
+- apply: bigcup_countable => // n _; apply: finite_set_countable.
+  exact/finite_image/ finite_fset.
+- by move => ? [? _ [? _ <-]]; exact: open_interior.
+- move=> x V /nbhs_ballP [] _/posnumP[eps] ballsubV.
+  have [//|N] := @ltr_add_invr R 0%R (eps%:num/2) _; rewrite add0r => deleps.
+  have [w wh fx] : exists2 w : T, w \in h'' N & f N w x.
+    by have [_ /(_ x) [// | w ? ?]] := projT2 (h' N); exists w.
+  exists (f N w); first split => //; first (by exists N).
+  apply: (subset_trans _ ballsubV) => z bz.
+  rewrite [_%:num]splitr; apply: (@ball_triangle _ _ _ w).
+    by apply: (le_ball (ltW deleps)); apply/ball_sym; apply: interior_subset.
+  by apply: (le_ball (ltW deleps)); apply: interior_subset.
+Qed.
+
+Lemma clopen_surj {d} {R : realType} {T : pseudoPMetricType d R} :
+  compact [set: T] -> $|{surjfun [set: nat] >-> @clopen d T}|.
+Proof.
+move=> cmptT.
+suff : @clopen _ T = set0 \/ $|{surjfun [set: nat] >-> @clopen _ T}|.
+  by case => //; rewrite eqEsubset => -[/(_ _ clopenT)].
+exact/pfcard_geP/clopen_countable/compact_second_countable.
 Qed.
 
 Section entourages.

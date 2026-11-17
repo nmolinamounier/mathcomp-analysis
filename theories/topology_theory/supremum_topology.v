@@ -1,7 +1,8 @@
 (* mathcomp analysis (c) 2026 Inria and AIST. License: CeCILL-C.              *)
 From HB Require Import structures.
 From mathcomp Require Import boot order algebra finmap all_classical.
-From mathcomp Require Import topology_structure uniform_structure.
+From mathcomp Require Import topology_structure uniform_structure
+  separation_axioms.
 
 (**md**************************************************************************)
 (* # Supremum topology                                                        *)
@@ -70,6 +71,86 @@ End Sup_Topology.
 HB.instance Definition _ (I : Type) d (T : pointedType)
   (f : I -> Topological d T) :=
   Pointed.on (sup_topology f).
+
+Section sup_separation.
+
+Section sup_kolmogorov.
+Context {I : pointedType} {d : I -> _} {T : choiceType}
+  (Tc : forall i, Kolmogorov (d i) T).
+
+Local Notation S := (sup_topology Tc).
+
+Let sup_kolmogorovP : kolmogorov_space S.
+Proof.
+move=> x y xy.
+pose Ti := Kolmogorov.Pack (Tc point).
+have xy' : x != y :> Ti by move: xy; apply: contra_neq => ->.
+have [A hA] := @kolmogorovP _ Ti x y xy'.
+exists A.
+wlog [Anx nAy] : x y xy {xy' hA} / nbhs (x :> Ti) A /\ ~ A y.
+  case: hA => [hL /(_ x y xy hL) //|hR /(_ y x _ hR)].
+  by rewrite eq_sym => /(_ xy); case; [right|left].
+left; split=> //; exists A° => /=; split=> //; last first.
+  exact: (@interior_subset _ Ti).
+exists [set A°]; last exact: bigcup_set1.
+rewrite sub1set inE; exists (fset1 A°); last first.
+  by rewrite set_fset1 bigcap_set1.
+move=> /= B; rewrite in_fset1 inE => /eqP -> {B}.
+by exists point => //; exact: open_interior.
+Qed.
+
+HB.instance Definition _ := Topological_isKolmogorov.Build _ S sup_kolmogorovP.
+
+End sup_kolmogorov.
+
+Section sup_accessible.
+Context {I : pointedType} {d : I -> _} {T : choiceType}
+  (Tc : forall i, Accessible (d i) T).
+
+Local Notation S := (sup_topology Tc).
+
+Let sup_accessibleP : accessible_space S.
+Proof.
+move=> x y xy.
+pose Ti := Accessible.Pack (Tc point).
+have xy' : x != y :> Ti by move: xy; apply: contra_neq => ->.
+have [U [oU Ux nUy]] := @accessibleP  _ Ti x y xy'.
+exists U; split=> //; exists [set U]; last exact: bigcup_set1.
+by rewrite sub1set inE; apply: open_finI_from1; exists point.
+Qed.
+
+HB.instance Definition _ := Topological_isAccessible.Build _ S sup_accessibleP.
+
+End sup_accessible.
+
+Section sup_hausdorff.
+Context {I : pointedType} {d : I -> _} {T : choiceType}
+  (Tc : forall i, Hausdorff (d i) T).
+
+Local Notation S := (sup_topology Tc).
+
+Let sup_hausdorffP : hausdorff_space S.
+Proof.
+move=> x y xy.
+pose Ti := Hausdorff.Pack (Tc point).
+have xy' : x != y :> Ti by move: xy; apply: contra_neq => ->.
+have [A [B [An Bn dAB]]] := @hausdorffP  _ Ti x y xy'.
+exists A, B; split=> //.
+- exists A°; split=> //=; last exact: (@interior_subset _ Ti).
+  exists [set A°]; last exact: bigcup_set1.
+  rewrite sub1set inE; apply: open_finI_from1. 
+  by exists point => //; exact: open_interior.
+- exists B°; split=> //=; last exact: (@interior_subset _ Ti).
+  exists [set B°]; last exact: bigcup_set1.
+  rewrite sub1set inE; apply: open_finI_from1. 
+  by exists point => //; exact: open_interior.
+Qed.
+
+HB.instance Definition _ := Topological_isHausdorff.Build _ S sup_hausdorffP.
+
+End sup_hausdorff.
+
+End sup_separation.
 
 Section sup_uniform.
 Local Open Scope relation_scope.
@@ -183,7 +264,7 @@ exists (\bigcap_(w in [set` F]) f w); repeat split.
   by apply/mem_set/FsubE => it /Ifwt/interior_subset => /set_mem.
 Qed.
 
-HB.instance Definition _ := @Nbhs_isUniform.Build _ Tt sup_ent
+HB.instance Definition _ := @Topological_isUniform.Build _ Tt sup_ent
    sup_ent_filter sup_ent_refl sup_ent_inv sup_ent_split sup_ent_nbhs.
 
 Lemma countable_sup_ent :

@@ -335,8 +335,8 @@ Qed.
 
 Lemma zero_dimension_prod (I : choiceType) d
     (T : forall i : I, topologicalType (d i)) :
-  (forall i, zero_dimensional (T i)) ->
-  zero_dimensional (forall i, T i).
+  (forall i, totally_separated (T i)) ->
+  totally_separated (forall i, T i).
 Proof.
 move=> dctTI x y /eqP xneqy.
 have [i/eqP/dctTI [U [clU Ux nUy]]] : exists i, x i <> y i.

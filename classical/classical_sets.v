@@ -2694,6 +2694,16 @@ Proof. by apply/eqP => /seteqP[] /(_ point) /(_ Logic.I). Qed.
 
 End PointedTheory.
 
+Lemma cond_choice X (Y : pointedType) (Q : X -> Prop) (P : X -> Y -> Prop) :
+  (forall x, Q x -> exists y, P x y) -> {f & forall x, Q x -> P x (f x)}.
+Proof. exact: (@xcond_choice X Y point). Qed.
+
+Lemma cond_pair_choice X (Y Z : pointedType)
+    (Q : X -> Prop) (P : X -> Y -> Z -> Prop) :
+  (forall x, Q x -> exists y z, P x y z) ->
+  {f & {g & forall x, Q x -> P x (f x) (g x)}}.
+Proof. exact: (@xcond_pair_choice X Y Z point point). Qed.
+
 HB.mixin Record isBiPointed (X : Type) & Equality X := {
   zero : X;
   one : X;
